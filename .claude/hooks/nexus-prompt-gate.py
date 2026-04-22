@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SOKI: UserPromptSubmit hook.
+"""Nexus: UserPromptSubmit hook.
 
 Increments per-turn index, resets Decision-Gate flag, and injects either a
 bootstrap-pending reminder or the per-turn Decision-Gate + Exit-Gate contract.
@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from _soki_common import (  # noqa: E402
+from _nexus_common import (  # noqa: E402
     REQUIRED_FILES,
     REQUIRED_INVARIANTS_DIR,
     bootstrap_complete,
@@ -22,7 +22,7 @@ from _soki_common import (  # noqa: E402
 )
 
 
-TURN_CONTRACT = """=== SOKI TURN CONTRACT (per-turn) ===
+TURN_CONTRACT = """=== NEXUS TURN CONTRACT (per-turn) ===
 
 1) CONTEXT DECISION GATE — before any mutating tool (Edit/Write/MultiEdit/NotebookEdit/Bash/Task)
    you MUST emit, as plain text in this turn:
@@ -69,7 +69,7 @@ def main() -> int:
         read = set(bs.get("read_ledger", []))
         still_needed = [p for p in REQUIRED_FILES if p not in read]
         lines = [
-            "=== SOKI BOOTSTRAP STILL PENDING ===",
+            "=== NEXUS BOOTSTRAP STILL PENDING ===",
             "",
             "You have NOT finished Session Bootstrap. Non-read tools are BLOCKED.",
             "",

@@ -7,9 +7,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/soki-bootstrap.py",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/nexus-bootstrap.py",
             "timeout": 15,
-            "statusMessage": "SOKI bootstrap"
+            "statusMessage": "NEXUS bootstrap"
           }
         ]
       }
@@ -20,9 +20,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/soki-bootstrap.py",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/nexus-bootstrap.py",
             "timeout": 15,
-            "statusMessage": "SOKI re-bootstrap"
+            "statusMessage": "NEXUS re-bootstrap"
           }
         ]
       }
@@ -33,9 +33,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/soki-prompt-gate.py",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/nexus-prompt-gate.py",
             "timeout": 15,
-            "statusMessage": "SOKI turn contract"
+            "statusMessage": "NEXUS turn contract"
           }
         ]
       }
@@ -46,9 +46,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/soki-tool-gate.py",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/nexus-tool-gate.py",
             "timeout": 15,
-            "statusMessage": "SOKI tool gate"
+            "statusMessage": "NEXUS tool gate"
           }
         ]
       }
@@ -59,9 +59,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/soki-exit-gate.py",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/nexus-exit-gate.py",
             "timeout": 15,
-            "statusMessage": "SOKI exit gate"
+            "statusMessage": "NEXUS exit gate"
           }
         ]
       }

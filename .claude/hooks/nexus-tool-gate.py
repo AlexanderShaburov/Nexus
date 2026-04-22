@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SOKI: PreToolUse hook.
+"""Nexus: PreToolUse hook.
 
 - While bootstrap is pending: allow read-family tools, block everything else.
   Track Reads of required files and auto-upgrade bootstrap status when complete.
@@ -12,7 +12,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from _soki_common import (  # noqa: E402
+from _nexus_common import (  # noqa: E402
     MUTATING_TOOLS,
     READ_ONLY_TOOLS,
     REQUIRED_FILES,
@@ -70,7 +70,7 @@ def main() -> int:
             return 0
 
         reason = (
-            f"SOKI BOOTSTRAP PENDING: tool '{tool}' is BLOCKED. "
+            f"NEXUS BOOTSTRAP PENDING: tool '{tool}' is BLOCKED. "
             "Finish Session Bootstrap first: read the Mandatory Startup Reading Set "
             "(invariants + architecture + orchestration spec + navigation index), "
             "then emit the 'Session Bootstrap Completed' confirmation block. "
@@ -85,7 +85,7 @@ def main() -> int:
         decision = find_decision_gate(turn_text)
         if decision is None:
             reason = (
-                f"SOKI DECISION GATE MISSING: tool '{tool}' is BLOCKED. "
+                f"NEXUS DECISION GATE MISSING: tool '{tool}' is BLOCKED. "
                 "Before any mutating tool you MUST state, earlier in this turn:\n\n"
                 "### Context Decision\nKB consult required: YES|NO\nReasoning: <why>\n\n"
                 "If YES, name which KB documents you will read. If NO, justify and accept the risk."

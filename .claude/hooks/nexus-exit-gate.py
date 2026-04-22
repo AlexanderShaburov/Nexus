@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SOKI: Stop hook.
+"""Nexus: Stop hook.
 
 Parses the transcript for the current turn's assistant text and enforces:
 - bootstrap-completion confirmation block (when bootstrap is still pending);
@@ -15,7 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from _soki_common import (  # noqa: E402
+from _nexus_common import (  # noqa: E402
     emit,
     emit_block,
     find_bootstrap_confirmation,
@@ -45,7 +45,7 @@ def main() -> int:
 
     if bootstrap_pending and not find_bootstrap_confirmation(turn_text):
         emit_block(
-            "SOKI EXIT GATE: bootstrap is still pending. Read the required files and emit the "
+            "NEXUS EXIT GATE: bootstrap is still pending. Read the required files and emit the "
             "'Session Bootstrap Completed' confirmation block verbatim before ending this turn.",
             hook_event="Stop",
         )
@@ -54,7 +54,7 @@ def main() -> int:
     m = find_closure_block(turn_text)
     if not m:
         emit_block(
-            "SOKI EXIT GATE VIOLATION: Closure Block missing or malformed. End your response with:\n\n"
+            "NEXUS EXIT GATE VIOLATION: Closure Block missing or malformed. End your response with:\n\n"
             "Closure Block:\n- code changed: yes|no\n- KB changed: yes|no\n"
             "- session log written: yes|no\n- writeback evaluation performed: yes|no\n\n"
             "Dependency rules apply (code=yes => writeback=yes; KB=no => include "
@@ -86,7 +86,7 @@ def main() -> int:
         )
 
     if violations:
-        emit_block("SOKI EXIT GATE VIOLATION:\n  - " + "\n  - ".join(violations), hook_event="Stop")
+        emit_block("NEXUS EXIT GATE VIOLATION:\n  - " + "\n  - ".join(violations), hook_event="Stop")
         return 0
 
     emit({"continue": True})

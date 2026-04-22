@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SOKI: SessionStart + PreCompact hook.
+"""Nexus: SessionStart + PreCompact hook.
 
 Resets per-session state and injects the Mandatory Startup Reading Set into
 the model context. No heredoc shenanigans — stdin is the real hook input JSON.
@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from _soki_common import (  # noqa: E402
+from _nexus_common import (  # noqa: E402
     REQUIRED_FILES,
     REQUIRED_INVARIANTS_DIR,
     emit_context,
@@ -37,7 +37,7 @@ def main() -> int:
     invariant_missing = len(invariants) == 0
 
     lines = [
-        "=== SOKI SESSION BOOTSTRAP — MANDATORY ===",
+        "=== NEXUS SESSION BOOTSTRAP — MANDATORY ===",
         "",
         f"Event: {event}. This session is UNINITIALIZED.",
         "You MUST complete Session Bootstrap before performing any non-trivial work.",

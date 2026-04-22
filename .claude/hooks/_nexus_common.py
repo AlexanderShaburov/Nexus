@@ -1,4 +1,4 @@
-"""Shared helpers for SOKI hooks.
+"""Shared helpers for Nexus hooks.
 
 Keeps scripts concise and JSON-handling robust across hooks.
 Not a public API — consumed only by the .sh wrappers in this directory.
@@ -54,7 +54,7 @@ def project_dir() -> pathlib.Path:
 
 
 def state_path() -> pathlib.Path:
-    return project_dir() / ".soki" / "state.json"
+    return project_dir() / ".nexus" / "state.json"
 
 
 def read_hook_input() -> dict[str, Any]:

@@ -1,5 +1,5 @@
-# SOKI runtime state (regenerated per session)
-.soki/state.json
+# Nexus runtime state (regenerated per session)
+.nexus/state.json
 
 # Python bytecode caches
 __pycache__/
