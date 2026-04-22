@@ -1,7 +1,7 @@
 ---
 type: spec
 scope: system
-status: active
+status: approved
 date: 2026-04-17
 source_of_truth: true
 tags: [knowledge, orchestration]

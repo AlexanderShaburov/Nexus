@@ -1,4 +1,14 @@
-# spec--system--document-frontmatter.md
+---
+type: spec
+scope: system
+status: approved
+created: 2026-04-17
+updated: 2026-04-22
+source_of_truth: true
+tags: [frontmatter, metadata, kb-system]
+---
+
+# Document Frontmatter Specification
 
 ## Purpose
 

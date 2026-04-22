@@ -1,9 +1,9 @@
 ---
 type: spec
 scope: system
-status: draft
+status: approved
 created: 2026-04-18
-updated: 2026-04-19
+updated: 2026-04-22
 source_of_truth: true
 tags: [knowledge, exit-gate, lifecycle, writeback]
 ---
