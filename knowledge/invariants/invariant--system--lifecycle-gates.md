@@ -5,7 +5,7 @@ status: approved
 created: 2026-04-18
 updated: 2026-04-19
 source_of_truth: true
-tags: [invariant, lifecycle, gates, soki]
+tags: [invariant, lifecycle, gates, nexus]
 ---
 
 # Invariant: Lifecycle Gates
@@ -30,7 +30,7 @@ This invariant MAY be relaxed only via a formal `decision--system--…` document
 
 ## Pointer to enforcement
 
-- `.claude/hooks/soki-bootstrap.py`
-- `.claude/hooks/soki-prompt-gate.py`
-- `.claude/hooks/soki-tool-gate.py`
-- `.claude/hooks/soki-exit-gate.py`
+- `.claude/hooks/nexus-bootstrap.py`
+- `.claude/hooks/nexus-prompt-gate.py`
+- `.claude/hooks/nexus-tool-gate.py`
+- `.claude/hooks/nexus-exit-gate.py`

@@ -4,11 +4,11 @@ This file is the project-level memory loaded automatically by Claude Code. Keep 
 
 ## What this repository is
 
-This repository ships a **runtime enforcement system for the Nexus (formerly SOKI) (Session-Oriented Knowledge Integration) workflow**. It consists of:
+This repository ships a **runtime enforcement system for the Nexus workflow**. It consists of:
 
 - a populated Knowledge Vault under `knowledge/` (the ontology + canonical specs live there);
 - a set of Claude Code hooks under `.claude/hooks/` that enforce the Nexus lifecycle gates (Bootstrap, Context Decision, Exit);
-- per-session runtime state under `.soki/` (regenerated automatically; do not commit `state.json`).
+- per-session runtime state under `.nexus/` (regenerated automatically; do not commit `state.json`).
 
 The conceptual background paper is `nexus_approach.md` at repo root. The original advisory-style `knowledge/decisions/decision--system--advisory-bootstrap-legacy.md` (moved from `bootstrap.md`) is **superseded** by `knowledge/specs/spec--system--session-bootstrap.md` and the hooks — kept only for historical reference.
 
@@ -24,13 +24,13 @@ All non-trivial work is governed by three hook-enforced gates. The contract is:
 
 The enforcement layer is:
 
-- `.claude/hooks/soki-bootstrap.sh`
-- `.claude/hooks/soki-prompt-gate.sh`
-- `.claude/hooks/soki-tool-gate.sh`
-- `.claude/hooks/soki-exit-gate.sh`
-- `.claude/hooks/_soki_common.py` (shared helpers)
+- `.claude/hooks/nexus-bootstrap.py`
+- `.claude/hooks/nexus-prompt-gate.py`
+- `.claude/hooks/nexus-tool-gate.py`
+- `.claude/hooks/nexus-exit-gate.py`
+- `.claude/hooks/_nexus_common.py` (shared helpers)
 
-Hook config: `.claude/settings.json`. Runtime state: `.soki/state.json` (gitignored).
+Hook config: `.claude/settings.json`. Runtime state: `.nexus/state.json` (gitignored).
 
 ## Mandatory Startup Reading Set
 
@@ -57,4 +57,4 @@ Use the navigation index (`knowledge/index/index--system--project-navigation.md`
 ## When editing hooks
 
 - Hook text that references spec content MUST be mirrored in the corresponding spec (drift breaks coherence).
-- After changes, run the validation plan in `docs/soki-implementation-report.md` before claiming the hooks work.
+- After changes, run the validation plan in `docs/nexus-implementation-report.md` before claiming the hooks work.

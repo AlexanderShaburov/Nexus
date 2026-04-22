@@ -8,7 +8,7 @@ license: Internal
 
 This skill adapts an **existing project** into a **knowledge-driven project**.
 
-It is used **after** the Knowledge Vault / Nexus (formerly SOKI) foundation exists, but **before** the agent can safely assume that `knowledge/` already reflects the real project.
+It is used **after** the Knowledge Vault / Nexus foundation exists, but **before** the agent can safely assume that `knowledge/` already reflects the real project.
 
 The goal is **not** to copy everything into the Knowledge Vault.
 The goal is to:

@@ -5,10 +5,10 @@ status: approved
 created: 2026-04-18
 updated: 2026-04-22
 source_of_truth: true
-tags: [architecture, system, soki, lifecycle]
+tags: [architecture, system, nexus, lifecycle]
 ---
 
-# Overall Structure (Nexus (formerly SOKI) System)
+# Overall Structure (Nexus System)
 
 ## Purpose
 
@@ -33,17 +33,17 @@ Directories by role:
 
 ### 2. Enforcement Runtime (`.claude/hooks/`)
 
-Shell + Python scripts invoked by Claude Code at lifecycle events. They read and mutate `.soki/state.json` and inject `additionalContext` / `decision: block` JSON to steer the agent.
+Shell + Python scripts invoked by Claude Code at lifecycle events. They read and mutate `.nexus/state.json` and inject `additionalContext` / `decision: block` JSON to steer the agent.
 
-- `soki-bootstrap.py` — runs on `SessionStart` and `PreCompact`. Resets state, injects the Mandatory Startup Reading Set.
-- `soki-prompt-gate.py` — runs on `UserPromptSubmit`. Resets per-turn state and injects Decision Gate + Exit Gate reminders. Hard-blocks prompts while bootstrap is pending unless the prompt is a read-only KB query.
-- `soki-tool-gate.py` — runs on `PreToolUse`. While bootstrap pending, only `Read`/`Glob`/`Grep`/`LS` of `knowledge/` are allowed. Tracks read-ledger to auto-complete bootstrap. After bootstrap, non-read tools require a Decision Gate statement in the current turn.
-- `soki-exit-gate.py` — runs on `Stop`. Parses transcript, validates Closure Block presence + field shape + dependency rules. Blocks completion with a `reason` on violation.
+- `nexus-bootstrap.py` — runs on `SessionStart` and `PreCompact`. Resets state, injects the Mandatory Startup Reading Set.
+- `nexus-prompt-gate.py` — runs on `UserPromptSubmit`. Resets per-turn state and injects Decision Gate + Exit Gate reminders. Hard-blocks prompts while bootstrap is pending unless the prompt is a read-only KB query.
+- `nexus-tool-gate.py` — runs on `PreToolUse`. While bootstrap pending, only `Read`/`Glob`/`Grep`/`LS` of `knowledge/` are allowed. Tracks read-ledger to auto-complete bootstrap. After bootstrap, non-read tools require a Decision Gate statement in the current turn.
+- `nexus-exit-gate.py` — runs on `Stop`. Parses transcript, validates Closure Block presence + field shape + dependency rules. Blocks completion with a `reason` on violation.
 
-### 3. Runtime State (`.soki/`)
+### 3. Runtime State (`.nexus/`)
 
-- `.soki/state.json` — per-session runtime state (bootstrap status, read-ledger, per-turn decision flag, prompt index). Ephemeral; regenerated at each `SessionStart`.
-- `.soki/README.md` — explains the directory.
+- `.nexus/state.json` — per-session runtime state (bootstrap status, read-ledger, per-turn decision flag, prompt index). Ephemeral; regenerated at each `SessionStart`.
+- `.nexus/README.md` — explains the directory.
 
 ### 4. Project Instructions
 
@@ -55,24 +55,24 @@ Shell + Python scripts invoked by Claude Code at lifecycle events. They read and
 
 ```
 SessionStart / PreCompact
-  └─> soki-bootstrap.py
-        ├─ reset .soki/state.json (bootstrap = pending)
+  └─> nexus-bootstrap.py
+        ├─ reset .nexus/state.json (bootstrap = pending)
         └─ inject mandatory reading set into first turn context
 
 UserPromptSubmit
-  └─> soki-prompt-gate.py
+  └─> nexus-prompt-gate.py
         ├─ reset per-turn flags
         ├─ if bootstrap pending: inject bootstrap-first reminder
         └─ else: inject Decision Gate + Exit Gate contract
 
 PreToolUse
-  └─> soki-tool-gate.py
+  └─> nexus-tool-gate.py
         ├─ if bootstrap pending: allow only read-tools on knowledge/
         ├─ if bootstrap pending and Read hits a required file: record; upgrade if complete
         └─ if bootstrap done and tool is mutating: require Decision Gate text in current turn
 
 Stop
-  └─> soki-exit-gate.py
+  └─> nexus-exit-gate.py
         ├─ locate last user turn in transcript
         ├─ regex-match Closure Block in assistant text of that turn
         ├─ validate fields + dependency rules
@@ -83,7 +83,7 @@ Stop
 
 ## Data Contracts
 
-### State file shape (`.soki/state.json`)
+### State file shape (`.nexus/state.json`)
 
 ```json
 {
@@ -102,7 +102,7 @@ Stop
 }
 ```
 
-### Closure Block grammar (enforced by soki-exit-gate.py)
+### Closure Block grammar (enforced by nexus-exit-gate.py)
 
 ```
 Closure Block:
@@ -114,7 +114,7 @@ Closure Block:
 
 Dependency rules: if `code changed: yes` then `writeback evaluation performed: yes`. If `KB changed: no` the turn MUST include a justification (free-form text on a subsequent line starting with `KB unchanged because`).
 
-### Decision Gate grammar (enforced by soki-tool-gate.py)
+### Decision Gate grammar (enforced by nexus-tool-gate.py)
 
 Must appear in the current turn's assistant text before any mutating tool call:
 

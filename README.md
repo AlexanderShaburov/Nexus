@@ -1,4 +1,4 @@
-# Nexus (formerly SOKI) Knowledge Runtime
+# Nexus Knowledge Runtime
 
 ## What this repository is
 
@@ -15,7 +15,7 @@ This repository is not just a folder of documents. It is a **runtime discipline*
 
 - a project knowledge structure under `knowledge/`
 - Claude hook enforcement under `.claude/hooks/`
-- runtime session state under `.soki/`
+- runtime session state under `.nexus/`
 - optional operational skills such as `project-ingest`
 
 ---
@@ -107,7 +107,7 @@ The enforcement layer.
 
 These hooks implement the runtime discipline that keeps the agent inside the Nexus workflow.
 
-### 3. `.soki/`
+### 3. `.nexus/`
 Runtime state used by the hooks.
 
 This is where session-level state such as bootstrap progress is stored.
@@ -161,15 +161,15 @@ A typical layout looks like this:
 .
 ├── .claude/
 │   ├── hooks/
-│   │   ├── _soki_common.py
-│   │   ├── soki-bootstrap.py
-│   │   ├── soki-prompt-gate.py
-│   │   ├── soki-tool-gate.py
-│   │   └── soki-exit-gate.py
+│   │   ├── _nexus_common.py
+│   │   ├── nexus-bootstrap.py
+│   │   ├── nexus-prompt-gate.py
+│   │   ├── nexus-tool-gate.py
+│   │   └── nexus-exit-gate.py
 │   ├── settings.json
 │   └── skills/
 │       └── project-ingest.md
-├── .soki/
+├── .nexus/
 │   └── README.md
 ├── knowledge/
 │   ├── index/
@@ -203,7 +203,7 @@ Copy into the target repository root:
 
 - `.claude/hooks/`
 - `.claude/settings.json`
-- `.soki/README.md`
+- `.nexus/README.md`
 - `knowledge/` skeleton
 - `CLAUDE.md`
 - optional skill files under `.claude/skills/` or project-local skills directory
@@ -221,7 +221,7 @@ chmod +x .claude/hooks/*.py
 Add this to `.gitignore` if not already present:
 
 ```gitignore
-.soki/state.json
+.nexus/state.json
 ```
 
 ### Step 4 — Seed the minimum required knowledge files
@@ -259,7 +259,7 @@ Copy into the existing repository root:
 
 - `.claude/hooks/`
 - `.claude/settings.json`
-- `.soki/README.md`
+- `.nexus/README.md`
 - `knowledge/` skeleton
 - `CLAUDE.md`
 - optional skills
@@ -421,7 +421,7 @@ Use this checklist when enabling Nexus in a repository.
 - [ ] `.claude/settings.json` present
 - [ ] `knowledge/` created
 - [ ] startup reading set exists
-- [ ] `.soki/state.json` ignored
+- [ ] `.nexus/state.json` ignored
 - [ ] `/hooks` run after config install/update
 
 ## Recommended

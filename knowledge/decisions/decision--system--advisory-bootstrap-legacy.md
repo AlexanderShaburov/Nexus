@@ -8,7 +8,7 @@ source_of_truth: false
 tags: [decision, legacy, bootstrap, advisory, deprecated]
 ---
 
-# Decision: Advisory Bootstrap (Legacy, Superseded by Nexus (formerly SOKI))
+# Decision: Advisory Bootstrap (Legacy, Superseded by Nexus)
 
 **Status:** Deprecated — superseded on 2026-04-20 by the Nexus lifecycle enforcement (Session Bootstrap, Context Decision Gate, Exit Gate).
 

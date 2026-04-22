@@ -10,7 +10,7 @@ tags: [glossary, terminology, canonical]
 
 # Terminology Glossary
 
-This document fixes canonical terminology for the Nexus (formerly SOKI) knowledge system. All specs, architecture docs, decisions, plans, index entries, and hook messages MUST use these terms as defined. Drift is a validation failure.
+This document fixes canonical terminology for the Nexus knowledge system. All specs, architecture docs, decisions, plans, index entries, and hook messages MUST use these terms as defined. Drift is a validation failure.
 
 ---
 
@@ -78,8 +78,7 @@ MUST NOT be renamed to `KV` or expanded inline in those fields unless a formal d
 Terms retained for **compatibility during transition**. These are NOT retired and NOT a validation failure — but new documents SHOULD prefer the canonical form.
 
 | Alias | Canonical replacement | Status | Notes |
-|---|---|---|---|
-| `SOKI` | `Nexus` | Legacy alias (from 2026-04-22) | "Session-Oriented Knowledge Integration". Retained in hook source (`.claude/hooks/soki-*.py`, `_soki_common.py`), runtime directory (`.soki/`), `.claude/settings.json` command paths + status messages, `.gitignore` entries, `docs/COMM.log` historical entries, `docs/soki-implementation-report.md` historical content, and other automation-coupled identifiers — until a future migration phase. See `knowledge/decisions/adr--system--rename-soki-to-nexus.md`. New prose SHOULD use `Nexus`; first meaningful mention in each active document MAY use `Nexus (formerly SOKI)`. |
+
 
 ---
 

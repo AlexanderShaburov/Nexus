@@ -12,7 +12,7 @@ tags: [index, navigation, routing]
 
 This index is the entry point to the Knowledge Vault. It tells the agent **where to look first** when bootstrapping or when resolving a task.
 
-The vault enforces the Nexus (formerly SOKI) lifecycle (Bootstrap → Decision → Execution → Exit) via three gates. The hooks under `.claude/hooks/` implement those gates.
+The vault enforces the Nexus lifecycle (Bootstrap → Decision → Execution → Exit) via three gates. The hooks under `.claude/hooks/` implement those gates.
 
 ---
 
@@ -58,12 +58,12 @@ These specs define how the vault itself and the agent lifecycle are enforced. Th
 
 ## Runtime (hooks)
 
-Hooks live outside the vault under `.claude/hooks/` and operate against runtime state in `.soki/`. They are **the enforcement layer** for the specs above — the specs are the contract, the hooks are the mechanism.
+Hooks live outside the vault under `.claude/hooks/` and operate against runtime state in `.nexus/`. They are **the enforcement layer** for the specs above — the specs are the contract, the hooks are the mechanism.
 
-- `soki-bootstrap.py` — SessionStart, PreCompact
-- `soki-prompt-gate.py` — UserPromptSubmit
-- `soki-tool-gate.py` — PreToolUse
-- `soki-exit-gate.py` — Stop
+- `nexus-bootstrap.py` — SessionStart, PreCompact
+- `nexus-prompt-gate.py` — UserPromptSubmit
+- `nexus-tool-gate.py` — PreToolUse
+- `nexus-exit-gate.py` — Stop
 
 ---
 
