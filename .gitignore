@@ -1,0 +1,12 @@
+# SOKI runtime state (regenerated per session)
+.soki/state.json
+
+# Python bytecode caches
+__pycache__/
+*.pyc
+
+# Personal per-user Claude Code settings (not team-shared)
+.claude/settings.local.json
+
+# macOS
+.DS_Store

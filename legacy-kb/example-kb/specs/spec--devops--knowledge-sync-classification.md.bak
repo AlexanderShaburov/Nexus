@@ -1,0 +1,312 @@
+# Knowledge Sync Classification Specification
+
+## Purpose
+
+This specification defines how code and data changes are classified in 
+terms of their **knowledge impact**.
+
+The goal is to ensure that:
+
+* architectural and behavioral changes are reflected in the Knowledge 
+Vault;
+* non-structural changes do not produce noise;
+* sync-check tooling operates on **Vault-derived rules**, not path 
+heuristics.
+
+---
+
+## Core Principle
+
+A change is considered **knowledge-bearing** if it affects:
+
+* system architecture;
+* domain model;
+* invariants or rules;
+* cross-module protocols;
+* data contracts;
+* documented behavior.
+
+A change is **not knowledge-bearing** if it affects only:
+
+* presentation;
+* styling;
+* test verification;
+* runtime artifacts;
+* content within existing schemas.
+
+---
+
+## Classification Model
+
+All changes MUST be classified into one of four categories:
+
+### 1. ALWAYS (Hard Fail)
+
+Changes that **always require Knowledge Vault validation or update**.
+
+These changes affect **architectural contracts** or **invariants**.
+
+---
+
+### 2. SOMETIMES (Soft Warning)
+
+Changes that **may require Knowledge Vault updates**, depending on 
+context.
+
+These changes affect **control flow**, **integration points**, or **data 
+wiring**.
+
+---
+
+### 3. NEVER (Silent Pass)
+
+Changes that **never require Knowledge Vault updates**.
+
+These changes are strictly **presentation** or **verification-only**.
+
+---
+
+### 4. SKIP (Mechanical Ignore)
+
+Changes that are **not relevant to classification**.
+
+These include system artifacts and non-project files.
+
+---
+
+## Classification Rules
+
+### Rule Group A — System Layers
+
+(Source: `architecture--system--overall-structure.md`)
+
+| Layer          | Path                                                   
+| Classification    | Notes                                 |
+| -------------- | ------------------------------------------------------ 
+| ----------------- | ------------------------------------- |
+| Vault (media)  | `vault/arts/**`, `vault/hopper/**`, `vault/streams/**` 
+| NEVER             | Binary assets                         |
+| Vault (data)   | `vault/json/**`                                        
+| SOMETIMES         | Schema vs content not distinguishable |
+| Knowledge      | `knowledge/**`                                         
+| SKIP              | Validated by separate system          |
+| Rules          | `rules/**`                                             
+| ALWAYS            | Source of invariants                  |
+| Docs           | `Docs/**`                                              
+| SOMETIMES / NEVER | See Rule Group E                      |
+| Infrastructure | `docker/**`                                            
+| SOMETIMES         | Topology may change architecture      |
+
+---
+
+### Rule Group B — Frontend Layering (FSD)
+
+(Source: `architecture--system--frontend-layering.md`, 
+`invariant--architecture--downward-only-dependencies.md`)
+
+| Path                                             | Classification | 
+Rationale                                    |
+| ------------------------------------------------ | -------------- | 
+-------------------------------------------- |
+| `entities/{art,block,stream,event,homeDoc}/**`   | ALWAYS         | 
+Domain model is fixed and controlled         |
+| `entities/* (non-domain)`                        | SOMETIMES      | Type 
+contracts and supporting modules        |
+| `shared/nav/**`                                  | ALWAYS         | 
+Journey protocol invariant                   |
+| `shared/state/**`                                | ALWAYS         | 
+Store hierarchy = architecture               |
+| `features/*/session/**`, `features/*/context/**` | SOMETIMES      | 
+Control plane logic                          |
+| `features/*/api/**`                              | SOMETIMES      | API 
+contracts                                |
+| `features/*/ui/**`                               | NEVER          | UI 
+must not contain business logic           |
+| `shared/ui/**`                                   | NEVER          | UI 
+primitives                                |
+| `shared/galleryLayouts/**`                       | NEVER          | 
+Presentation only                            |
+| `shared/lib/**`                                  | SOMETIMES [C]  | 
+Mixed domain + utility logic                 |
+| `app/router.tsx`                                 | ALWAYS         | 
+Route map is part of architecture            |
+| `app/** (excluding router)`                      | SOMETIMES      | 
+Provider chains                              |
+| `pages/admin/**`                                 | SOMETIMES [C]  | Some 
+pages contain logic (legacy violations) |
+| `pages/public/**`                                | SOMETIMES [C]  | Data 
+wiring and rendering pipelines          |
+| `*.css`                                          | NEVER          | 
+Styling only                                 |
+| `*.test.ts`, `__tests__/**`                      | NEVER          | 
+Tests do not define architecture             |
+
+---
+
+### Rule Group C — Backend
+
+(Source: `decision--data--json-vault-no-database.md`, domain model)
+
+| Path                           | Classification | Rationale            |
+| ------------------------------ | -------------- | -------------------- |
+| `admin-backend/app/models/**`  | ALWAYS         | API contracts        |
+| `admin-backend/app/repos/**`   | ALWAYS         | Storage patterns     |
+| `admin-backend/app/routers/**` | ALWAYS         | Endpoint definitions |
+| `admin-backend/app/main.py`    | SOMETIMES      | Router mounting      |
+
+---
+
+### Rule Group D — Domain and Protocol Invariants
+
+| Area            | Path                                           | 
+Classification | Source                               |
+| --------------- | ---------------------------------------------- | 
+-------------- | ------------------------------------ |
+| Domain entities | `entities/{art,block,stream,event,homeDoc}/**` | 
+ALWAYS         | `entities-are-finite-and-controlled` |
+| Journey system  | `shared/nav/**`                                | 
+ALWAYS         | `all-cross-editor-flows-use-journey` |
+| State system    | `shared/state/**`                              | 
+ALWAYS         | `no-global-data-in-react-contexts`   |
+| Data contracts  | backend models/repos                           | 
+ALWAYS         | data decision docs                   |
+
+---
+
+### Rule Group E — Documentation
+
+| Pattern                                                                | 
+Classification | Notes                      |
+| ---------------------------------------------------------------------- | 
+-------------- | -------------------------- |
+| `Docs/plans/**`, `Docs/*IMPLEMENTATION_PLAN*`                          | 
+NEVER          | Task-scoped                |
+| `Docs/DEVELOPMENT_BLOG/**`, `Docs/projectBlog/**`                      | 
+NEVER          | Informational              |
+| `Docs/KANBAN/**`, `Docs/bugs/**`                                       | 
+NEVER          | Operational                |
+| `Docs/mds/**`, migration/setup notes                                   | 
+NEVER          | Non-architectural          |
+| `Docs/MANUAL_TEST_PLAN*`, audits                                       | 
+NEVER          | Snapshot artifacts         |
+| `Docs/COMM.log`                                                        | 
+SKIP           | Conversation log           |
+| `Docs/*SPEC*`, `*CONTRACT*`, `*ARCHITECTURE*`, agreements, `PROJECT_*` | 
+SOMETIMES      | May define system behavior |
+| Other Docs                                                             | 
+SOMETIMES [C]  | Conservative default       |
+
+---
+
+## Conservative Classification [C]
+
+Some paths cannot be reliably classified at the directory level.
+
+These are intentionally marked as SOMETIMES:
+
+* `shared/lib/**`
+* `pages/public/**`
+* `pages/admin/**`
+* `vault/json/**`
+* `docker/**`
+* unspecified `Docs/**`
+
+Reason:
+
+* mixed responsibilities within the same directory;
+* lack of machine-detectable structural boundaries;
+* limitations of path-based classification.
+
+These cases MUST produce **warnings, not failures**.
+
+---
+
+## Mechanical Rules (SKIP)
+
+The following checks do not require Knowledge Vault:
+
+* empty or invalid input paths;
+* path normalization;
+* binary files and generated artifacts;
+* git parsing;
+* `knowledge/**` validation (handled separately).
+
+---
+
+## Sync-Check Behavior
+
+### ALWAYS
+
+* block execution;
+* require Knowledge Vault validation/update;
+* include reference to relevant Vault documents.
+
+### SOMETIMES
+
+* allow execution;
+* emit warning;
+* include guidance on what to verify.
+
+### NEVER
+
+* allow execution silently.
+
+### SKIP
+
+* ignore.
+
+---
+
+## Explainability Requirement
+
+Every classification MUST be explainable:
+
+* which rule group was applied;
+* which Vault document defines the rule;
+* why the path falls into this category.
+
+Example:
+
+```
+ALWAYS: shared/nav/transporter.ts
+
+Reason:
+- invariant: all cross-editor flows use Journey
+- document: invariant--navigation--all-cross-editor-flows-use-journey.md
+```
+
+---
+
+## Limitations
+
+* Path-based classification cannot distinguish:
+
+  * schema vs content changes in JSON;
+  * domain logic vs utility logic in mixed directories;
+* Some architectural violations (e.g., logic in UI or pages) reduce 
+accuracy;
+* The system is intentionally conservative in ambiguous cases.
+
+---
+
+## Future Improvements
+
+* Move domain logic out of `shared/lib/**`;
+* enforce strict FSD boundaries;
+* introduce JSON schema-aware diffing;
+* classify Docs using metadata instead of path patterns;
+* integrate AST-based analysis for higher precision.
+
+---
+
+## Summary
+
+This system replaces flat heuristics with a **Vault-driven classification 
+model**.
+
+* Architecture defines rules.
+* Rules define classification.
+* Classification drives sync behavior.
+
+Knowledge Vault is the **source of truth**, not the filesystem.
+

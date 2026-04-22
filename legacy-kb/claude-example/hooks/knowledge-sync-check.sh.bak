@@ -1,0 +1,350 @@
+#!/usr/bin/env bash
+
+# knowledge-sync-check.sh — detects project/code changes that bypass knowledge sync
+# Runs as PostToolUse hook. Receives hook JSON on stdin.
+# Exit 2 + stderr when knowledge-bearing files change without knowledge/ updates.
+#
+# Classification derived from Knowledge Vault documents:
+#   architecture--system--overall-structure.md        → system layers, deployment topology
+#   architecture--system--frontend-layering.md        → FSD sublayers, route map
+#   architecture--data--domain-model.md               → entity modules, block types, ID formats
+#   architecture--state--custom-pubsub-stores.md      → store hierarchy
+#   invariant--architecture--entities-are-finite-and-controlled.md → 5 domain entities
+#   invariant--architecture--downward-only-dependencies.md         → layer boundaries
+#   invariant--architecture--no-business-logic-in-ui.md            → UI = view plane
+#   invariant--navigation--all-cross-editor-flows-use-journey.md   → Journey = mandatory
+#   invariant--state--no-global-data-in-react-contexts.md          → store = data plane
+#   decision--data--json-vault-no-database.md         → vault structure, repo contracts
+#
+# Intentionally conservative classifications (marked [C]):
+#   shared/lib     — contains both domain logic and presentational; can't split in bash
+#   pages/public   — some pages have data pipelines; some are pure rendering
+#   docker         — topology/routing changes affect overall-structure doc
+#   vault/json     — can't distinguish schema changes from content CRUD
+#   Docs (default) — unknown docs assumed potentially knowledge-bearing
+
+set -euo pipefail
+
+# --- Stdin extraction (mechanical) ---
+
+extract_file_path() {
+  local input
+  input=$(head -c 4096 2>/dev/null || true)
+  if [[ -z "$input" ]]; then
+    echo ""
+    return
+  fi
+  local path
+  path=$(echo "$input" | sed -n 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+  echo "${path:-}"
+}
+
+# --- Classification (Vault-derived) ---
+#
+# Returns: "always" | "sometimes" | "never" | "skip"
+#
+# "skip"      — not a project file / mechanical exclusion
+# "never"     — presentation, tests, UI view plane, ephemeral docs
+# "sometimes" — control plane, specs, data schema, non-domain entities  [often conservative]
+# "always"    — domain entities, Journey, stores, routes, backend contracts, rules
+
+classify_change() {
+  local p="$1"
+
+  # ─── Mechanical exclusions (no Vault knowledge needed) ───
+
+  case "$p" in
+    knowledge/*)       echo "skip"; return ;;
+    Docs/COMM.log)     echo "skip"; return ;;
+    docs/COMM.log)     echo "skip"; return ;;
+  esac
+
+  case "$p" in
+    *.png|*.jpg|*.jpeg|*.webp|*.gif|*.svg|*.ico) echo "skip"; return ;;
+    *.lock|*.log|package-lock.json|pnpm-lock.yaml|poetry.lock) echo "skip"; return ;;
+  esac
+
+  # ─── NEVER: presentation, tests, UI view plane, ephemeral docs ───
+
+  # CSS: presentation-only, no architectural knowledge
+  case "$p" in *.css) echo "never"; return ;; esac
+
+  # Tests: verify behavior, don't define architecture
+  case "$p" in
+    *.test.ts|*.test.tsx|*.spec.ts|*.spec.tsx) echo "never"; return ;;
+    */__tests__/*) echo "never"; return ;;
+  esac
+
+  # Vault binary media (overall-structure: vault media layer)
+  case "$p" in
+    vault/arts/*|vault/hopper/*|vault/streams/*) echo "never"; return ;;
+  esac
+
+  # Invariant "no business logic in UI" → feature UI components are view-only
+  case "$p" in apps/frontend/src/features/*/ui/*) echo "never"; return ;; esac
+
+  # Shared UI primitives and gallery layouts: presentation
+  case "$p" in
+    apps/frontend/src/shared/ui/*)             echo "never"; return ;;
+    apps/frontend/src/shared/galleryLayouts/*)  echo "never"; return ;;
+  esac
+
+  # [C] Admin pages: conservative classification per sync spec
+  # Some admin pages are thin wrappers, but some may contain logic or legacy violations.
+  case "$p" in apps/frontend/src/pages/admin/*) echo "sometimes"; return ;; esac
+
+  # Docs: ephemeral/operational subdirectories
+  case "$p" in
+    Docs/plans/*)            echo "never"; return ;;
+    Docs/DEVELOPMENT_BLOG/*) echo "never"; return ;;
+    Docs/projectBlog/*)      echo "never"; return ;;
+    Docs/KANBAN/*)           echo "never"; return ;;
+    Docs/bugs/*)             echo "never"; return ;;
+    Docs/mds/*)              echo "never"; return ;;
+  esac
+  # Docs: ephemeral file patterns
+  case "$p" in
+    Docs/MANUAL_TEST_PLAN*)       echo "never"; return ;;
+    Docs/*IMPLEMENTATION_PLAN*)   echo "never"; return ;;
+    Docs/*_AUDIT*)                echo "never"; return ;;
+  esac
+
+  # ─── ALWAYS: domain entities, Journey, stores, routes, contracts, rules ───
+
+  # Invariant "entities are finite and controlled" — 5 domain entities
+  # Changes always affect architecture--data--domain-model.md
+  case "$p" in
+    apps/frontend/src/entities/art/*)     echo "always"; return ;;
+    apps/frontend/src/entities/block/*)   echo "always"; return ;;
+    apps/frontend/src/entities/stream/*)  echo "always"; return ;;
+    apps/frontend/src/entities/event/*)   echo "always"; return ;;
+    apps/frontend/src/entities/homeDoc/*) echo "always"; return ;;
+  esac
+
+  # Invariant "all cross-editor flows use Journey"
+  # Ticket model, EditorKind, ROUTS map, return commands documented
+  case "$p" in apps/frontend/src/shared/nav/*) echo "always"; return ;; esac
+
+  # Invariant "no global data in React contexts" → store hierarchy = architecture
+  # Store additions/changes affect architecture--state--custom-pubsub-stores.md
+  case "$p" in apps/frontend/src/shared/state/*) echo "always"; return ;; esac
+
+  # Frontend-layering: route map is documented
+  case "$p" in apps/frontend/src/app/router.tsx) echo "always"; return ;; esac
+
+  # Backend: models define API contract (json-vault-no-database decision)
+  case "$p" in apps/admin-backend/app/models/*) echo "always"; return ;; esac
+
+  # Backend: repos define storage patterns and concurrency (documented per-repo)
+  case "$p" in apps/admin-backend/app/repos/*) echo "always"; return ;; esac
+
+  # Backend: routers define API endpoint contracts
+  case "$p" in apps/admin-backend/app/routers/*) echo "always"; return ;; esac
+
+  # Constitution and ADRs ARE the source of invariants
+  case "$p" in rules/*) echo "always"; return ;; esac
+
+  # ─── SOMETIMES: control plane, domain-adjacent, specs, data, infra ───
+
+  # Editor contexts are the control plane (CRUD, Journey, bootstrap)
+  case "$p" in
+    apps/frontend/src/features/*/session/*) echo "sometimes"; return ;;
+    apps/frontend/src/features/*/context/*) echo "sometimes"; return ;;
+  esac
+
+  # Renderable: content type discriminated union (not a domain entity, but documented)
+  case "$p" in apps/frontend/src/entities/renderable/*) echo "sometimes"; return ;; esac
+
+  # Non-domain entity modules (mediaItem, textVisual, catalog, common, hopper, publicStream)
+  case "$p" in apps/frontend/src/entities/*) echo "sometimes"; return ;; esac
+
+  # [C] shared/lib: contains dependency resolver, ID generation, domain type guards
+  #     alongside purely presentational code (fonts, colors, theme)
+  case "$p" in apps/frontend/src/shared/lib/*) echo "sometimes"; return ;; esac
+
+  # app/ (providers, layouts) — provider chain is documented in frontend-layering
+  case "$p" in apps/frontend/src/app/*) echo "sometimes"; return ;; esac
+
+  # [C] Public pages: some contain data-loading pipelines (EventPage), some are pure
+  case "$p" in apps/frontend/src/pages/public/*) echo "sometimes"; return ;; esac
+
+  # Features API hooks — sometimes introduce new endpoint contracts
+  case "$p" in apps/frontend/src/features/*/api/*) echo "sometimes"; return ;; esac
+
+  # Backend entry point — router mounts
+  case "$p" in apps/admin-backend/app/main.py) echo "sometimes"; return ;; esac
+
+  # [C] vault/json: can't distinguish schema changes from content CRUD
+  case "$p" in vault/json/*) echo "sometimes"; return ;; esac
+
+  # [C] docker: topology/routing changes affect overall-structure deployment doc
+  case "$p" in docker/*) echo "sometimes"; return ;; esac
+
+  # Docs: remaining files (specs, contracts, architecture) — conservative default
+  case "$p" in Docs/*) echo "sometimes"; return ;; esac
+
+  # Anything else under apps/ not yet classified
+  case "$p" in apps/*) echo "sometimes"; return ;; esac
+
+  # Not a recognized project path
+  echo "skip"
+}
+
+# --- Vault document lookup for ALWAYS-level changes ---
+
+vault_docs_for() {
+  local p="$1"
+  case "$p" in
+    apps/frontend/src/entities/art/*|apps/frontend/src/entities/block/*|apps/frontend/src/entities/stream/*|apps/frontend/src/entities/event/*|apps/frontend/src/entities/homeDoc/*)
+      echo "  - architecture--data--domain-model.md"
+      echo "  - invariant--architecture--entities-are-finite-and-controlled.md"
+      ;;
+    apps/frontend/src/shared/nav/*)
+      echo "  - architecture--navigation--journey-system.md"
+      echo "  - invariant--navigation--all-cross-editor-flows-use-journey.md"
+      ;;
+    apps/frontend/src/shared/state/*)
+      echo "  - architecture--state--custom-pubsub-stores.md"
+      echo "  - invariant--state--no-global-data-in-react-contexts.md"
+      ;;
+    apps/frontend/src/app/router.tsx)
+      echo "  - architecture--system--frontend-layering.md (route map section)"
+      ;;
+    apps/admin-backend/app/models/*|apps/admin-backend/app/repos/*)
+      echo "  - decision--data--json-vault-no-database.md"
+      echo "  - architecture--data--domain-model.md"
+      ;;
+    apps/admin-backend/app/routers/*)
+      echo "  - decision--data--json-vault-no-database.md"
+      ;;
+    rules/*)
+      echo "  - All invariant documents (rules ARE the source of invariants)"
+      ;;
+  esac
+}
+
+# --- Main ---
+
+TARGET_PATH="$(extract_file_path)"
+
+if [[ -z "$TARGET_PATH" ]]; then
+  exit 0
+fi
+
+# Normalize absolute path to relative (handles macOS /var → /private/var symlink)
+PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+if [[ "$TARGET_PATH" == "$PROJECT_ROOT"/* ]]; then
+  TARGET_PATH="${TARGET_PATH#$PROJECT_ROOT/}"
+elif [[ -d "$(dirname "$TARGET_PATH")" ]]; then
+  RESOLVED="$(cd "$(dirname "$TARGET_PATH")" && pwd -P)/$(basename "$TARGET_PATH")"
+  if [[ "$RESOLVED" == "$PROJECT_ROOT"/* ]]; then
+    TARGET_PATH="${RESOLVED#$PROJECT_ROOT/}"
+  fi
+fi
+
+LEVEL="$(classify_change "$TARGET_PATH")"
+
+if [[ "$LEVEL" == "skip" || "$LEVEL" == "never" ]]; then
+  exit 0
+fi
+
+# --- Check git for knowledge/ changes ---
+
+if ! command -v git >/dev/null 2>&1; then
+  echo "KNOWLEDGE SYNC CHECK WARNING: git is not available." >&2
+  exit 0
+fi
+
+STATUS_OUTPUT="$(git status --porcelain 2>/dev/null || true)"
+
+if [[ -z "$STATUS_OUTPUT" ]]; then
+  exit 0
+fi
+
+HAS_KNOWLEDGE_CHANGES=false
+
+while IFS= read -r line; do
+  path="$(echo "$line" | sed -E 's/^..[[:space:]]+//')"
+  case "$path" in
+    knowledge/*)
+      HAS_KNOWLEDGE_CHANGES=true
+      ;;
+  esac
+done <<< "$STATUS_OUTPUT"
+
+if [[ "$HAS_KNOWLEDGE_CHANGES" == true ]]; then
+  exit 0
+fi
+
+# --- Emit warning (severity depends on classification) ---
+
+if [[ "$LEVEL" == "always" ]]; then
+  {
+    cat <<EOF
+KNOWLEDGE SYNC REQUIRED
+
+A structurally significant file was modified:
+  $TARGET_PATH
+
+Classification: ALWAYS knowledge-bearing
+This file is covered by Knowledge Vault invariants or architecture documents.
+Changes here almost certainly require updates to knowledge/.
+
+Relevant Vault documents to check:
+EOF
+    vault_docs_for "$TARGET_PATH"
+    cat <<EOF
+
+Required action:
+1. Update the relevant knowledge/ documents, OR
+2. Explicitly state why this change does not affect documented architecture.
+
+Note: memory files (~/.claude/projects/.../memory/) are outside this repo
+and cannot be detected by this check.
+EOF
+  } >&2
+  exit 2
+fi
+
+# "sometimes" level
+GUIDANCE="Review whether this change affects documented architecture, behavior, contracts, routing, entity types, or control-plane logic. If yes, update the relevant knowledge/ documents. If not, make that decision explicit."
+
+case "$TARGET_PATH" in
+  apps/frontend/src/shared/lib/*)
+    GUIDANCE="shared/lib mixes domain logic and presentational utilities. Update knowledge/ if entity relationships, ID formats, or domain guards changed. No update needed for purely presentational helpers."
+    ;;
+  apps/frontend/src/pages/public/*)
+    GUIDANCE="pages/public may contain data-loading and rendering pipeline wiring. Update knowledge/ if data loading strategy, entity resolution, or rendering pipeline wiring changed. No update needed for layout or copy-only changes."
+    ;;
+  apps/frontend/src/pages/admin/*)
+    GUIDANCE="pages/admin is conservatively classified as SOMETIMES. Update knowledge/ if the page contains or changes non-trivial routing, orchestration, control flow, or data wiring. No update needed for thin wrapper or presentation-only changes."
+    ;;
+  vault/json/*)
+    GUIDANCE="vault/json mixes schema-level and content-level changes. Update knowledge/ if top-level structure, schemas, or entity fields changed. No update needed for ordinary content CRUD inside existing schemas."
+    ;;
+  docker/*)
+    GUIDANCE="docker may affect deployment topology. Update knowledge/ if service topology, reverse-proxy routing, or volume structure changed. No update needed for version bumps or build-only tweaks."
+    ;;
+  apps/frontend/src/features/*/session/*|apps/frontend/src/features/*/context/*)
+    GUIDANCE="Editor session/context files are control-plane logic. Update knowledge/ if journey flow, bootstrap logic, mode semantics, or save/apply behavior changed. No update needed for small fixes that preserve existing behavior."
+    ;;
+  apps/frontend/src/features/*/api/*)
+    GUIDANCE="features/*/api may affect endpoint contracts or data wiring. Update knowledge/ if request/response contracts or integration behavior changed."
+    ;;
+  apps/frontend/src/entities/*)
+    GUIDANCE="Non-domain entity module. Update knowledge/ if type contracts, catalog formats, or cross-module data semantics changed. No update needed for internal refactors that preserve contract."
+    ;;
+  Docs/*)
+    GUIDANCE="Docs changes require knowledge/ update only when they change specs, contracts, agreements, or architecture-relevant behavior. Operational notes and plans do not require sync."
+    ;;
+esac
+
+cat <<EOF
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "KNOWLEDGE SYNC CHECK — review needed for: $TARGET_PATH. Classification: SOMETIMES knowledge-bearing. No knowledge/ changes were detected. $GUIDANCE"
+  }
+}
+EOF
+exit 0
