@@ -1,4 +1,4 @@
-# Nexus (formerly SOKI) Installation & Usage Guide (Revised)
+# Nexus Installation & Usage Guide (Revised)
 
 ## Purpose
 
@@ -18,7 +18,7 @@ You need a **source repository** where Nexus is already prepared.
 From that repository you will copy:
 
 - `.claude/`
-- `.soki/`
+- `.nexus/`
 - `knowledge/`
 - `CLAUDE.md`
 
@@ -34,7 +34,7 @@ From the Nexus template repository, copy into your project root:
 
 ```
 .claude/
-.soki/
+.nexus/
 knowledge/
 CLAUDE.md
 ```
@@ -44,7 +44,7 @@ CLAUDE.md
 ```
 your-project/
 ├── .claude/
-├── .soki/
+├── .nexus/
 ├── knowledge/
 ├── CLAUDE.md
 ```
@@ -77,7 +77,7 @@ chmod +x .claude/hooks/*.py
 Add:
 
 ```
-.soki/state.json
+.nexus/state.json
 ```
 
 ---
