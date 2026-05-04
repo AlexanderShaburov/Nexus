@@ -3,9 +3,22 @@ type: architecture
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-04-22
+updated: 2026-05-04
 source_of_truth: true
 tags: [architecture, system, nexus, lifecycle]
+---
+
+## Relations
+
+- depends_on:
+  - [Knowledge Vault Specification](../specs/spec--system--knowledge-vault.md) — the vault is one of the components described here.
+- implements:
+  - [Session Bootstrap Specification](../specs/spec--system--session-bootstrap.md) — the bootstrap hook described here is the runtime realization of this spec.
+  - [Context Decision Gate Specification](../specs/spec--system--context-decision-gate.md) — the prompt/tool gates here realize this spec.
+  - [Exit Gate Specification](../specs/spec--system--exit-gate.md) — the stop hook here realizes this spec.
+- relates_to:
+  - [Lifecycle Gates Invariant](../invariants/invariant--system--lifecycle-gates.md) — the three non-negotiable gates this architecture enforces.
+
 ---
 
 # Overall Structure (Nexus System)

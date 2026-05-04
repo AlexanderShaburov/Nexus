@@ -3,7 +3,17 @@ name: project-ingest
 description: Inspect an existing or partially documented project, classify code and documents, construct or update the Knowledge Vault, label non-canonical materials as legacy/source/archive, detect code↔documentation mismatches, and produce an ingestion report. Use this when a Knowledge Vault has been installed but the project already exists or contains pre-existing code/docs outside knowledge/.
 license: Internal
 ---
+## Relations
 
+- depends_on:
+  - [Knowledge Graph Relations Specification](../../knowledge/specs/spec--system--knowledge-graph-relations.md) — defines relation types, validation rules, and relation-map requirements used during ingestion.
+  - [Knowledge Vault Specification](../../knowledge/specs/spec--system--knowledge-vault.md) — defines the target structure that ingestion builds or updates.
+
+- implements:
+  - [Knowledge-Driven Task Orchestration Specification](../../knowledge/specs/spec--system--knowledge-driven-task-orchestration.md) — operationalizes Retrieve / Ground / Sync for existing project ingestion.
+
+- relates_to:
+  - [Document Frontmatter Specification](../../knowledge/specs/spec--system--document-frontmatter.md) — created or updated knowledge documents must remain structured and parseable.
 # PROJECT KNOWLEDGE INGESTION
 
 This skill adapts an **existing project** into a **knowledge-driven project**.
@@ -263,11 +273,11 @@ The agent must explain non-obvious classifications briefly.
 
 ---
 
-# STEP 5 — EXTRACT CANONICAL KNOWLEDGE
+# STEP 5 — EXTRACT CANONICAL KNOWLEDGE AND RELATIONS
 
 From the most trustworthy sources, extract the project’s canonical operational knowledge.
 
-This typically includes:
+This includes:
 - project purpose,
 - domain model,
 - architecture,
@@ -277,18 +287,91 @@ This typically includes:
 - operational constraints,
 - deployment/runtime assumptions,
 - conventions,
-- current known decisions.
+- current known decisions,
+- relationships between extracted knowledge artifacts.
 
-When extracting knowledge:
-- distinguish **observed** facts from **inferred** conclusions,
-- avoid overstating confidence,
-- prefer code-backed conclusions when documentation is weak,
-- prefer explicit documentation when code intent is not obvious,
-- surface contradictions rather than smoothing them over.
+When extracting knowledge, the agent MUST also identify candidate relations.
+
+Allowed relation types (defined by `spec--system--knowledge-graph-relations.md`):
+
+- `depends_on` — target is required to understand this document.
+- `constrains` — this document limits or governs the target.
+- `implements` — this document realizes a spec or decision.
+- `supersedes` — this document replaces older knowledge.
+- `conflicts_with` — this document contradicts another.
+- `relates_to` — weak link; use sparingly.
+
+For each candidate, identify:
+- which concepts depend on other concepts;
+- which decisions constrain architecture;
+- which specs are implemented by workflows or code;
+- which documents supersede or conflict with older knowledge;
+- which artifacts must be read together to understand the project.
+
+The agent MUST distinguish:
+- extracted knowledge;
+- inferred knowledge;
+- candidate relations;
+- uncertain relations.
+
+The agent MUST NOT:
+- create relations from filename similarity alone;
+- create relations from co-location in the same directory;
+- create decorative or trivial links;
+- generate cycles of `relates_to` to inflate connectivity.
+
+This step MUST follow:
+
+- spec--system--knowledge-graph-relations.md
+
+for relation type definitions and extraction rules.
 
 ---
 
-# STEP 6 — BUILD OR UPDATE THE KNOWLEDGE VAULT
+# STEP 6 — BUILD AND VALIDATE THE RELATION MAP
+
+Before writing or updating Knowledge Vault documents, the agent MUST build a relation map.
+
+The relation map MUST list, per edge:
+- source document;
+- target document;
+- relation type (from the allowed set in Step 5);
+- evidence (concrete reference inside the source document);
+- confidence (low / medium / high);
+- reason why the relation helps navigation or decision-making.
+
+The agent MUST NOT:
+- create relations from filename similarity alone;
+- create relations from co-location;
+- include weak, redundant, or decorative relations.
+
+The agent SHOULD limit each document to **3–7** high-value relations.
+A document without relations is considered incomplete (except structural documents such as `index/`, which MAY omit them).
+
+If the Knowledge Vault already exists, the agent MUST classify its overall relation state as one of:
+
+- `none` — no document declares a `## Relations` section.
+- `partial` — some documents declare relations; others do not, or declarations are malformed (e.g. inside the YAML frontmatter, missing types, untyped pointers).
+- `valid` — every required document declares a well-formed `## Relations` section using the allowed relation types, evidence is verifiable, and the per-document cap is respected.
+
+If the classification is `none` or `partial`, this step becomes a repair pass: the agent MUST produce the missing or corrected Relations sections in Step 7.
+
+The agent MUST also emit, as part of the relation map, a list of **weak or unconnected documents** — documents that have fewer than two inbound or outbound high-value relations after validation, or no relations at all where required.
+
+Relation construction, validation, and typing MUST strictly follow:
+
+- spec--system--knowledge-graph-relations.md
+
+This includes:
+- allowed relation types,
+- relation validity rules,
+- relation constraints,
+- maximum relation density,
+- completeness requirements.
+
+---
+
+# STEP 7 — BUILD OR UPDATE THE KNOWLEDGE VAULT
 
 Create or update `knowledge/` so that the important operational knowledge becomes structured and retrievable.
 
@@ -312,9 +395,15 @@ When creating/updating knowledge documents, ensure they are:
 - explicit about uncertainty,
 - aligned with actual project evidence.
 
+All Relations sections MUST conform to:
+
+- spec--system--knowledge-graph-relations.md
+
+Non-compliant relation structures are considered invalid and MUST be corrected.
+
 ---
 
-# STEP 7 — HANDLE LEGACY DOCUMENTATION EXPLICITLY
+# STEP 8 — HANDLE LEGACY DOCUMENTATION EXPLICITLY
 
 Legacy documentation must be handled intentionally.
 
@@ -353,7 +442,7 @@ It may still be extremely useful, but it should not silently outrank the curated
 
 ---
 
-# STEP 8 — CHECK CODE ↔ DOCUMENTATION CONSISTENCY
+# STEP 9 — CHECK CODE ↔ DOCUMENTATION CONSISTENCY
 
 Review whether the actual codebase matches the existing documentation and the newly extracted project understanding.
 
@@ -377,7 +466,7 @@ If appropriate, organize them as:
 
 ---
 
-# STEP 9 — DEFINE THE POST-INGEST OPERATING MODE
+# STEP 10 — DEFINE THE POST-INGEST OPERATING MODE
 
 At the end of ingestion, the agent must state clearly what should now be treated as the operational source of truth.
 
@@ -391,7 +480,7 @@ If the Knowledge Vault is still incomplete, the agent must say so explicitly and
 
 ---
 
-# STEP 10 — PRODUCE THE INGESTION REPORT
+# STEP 11 — PRODUCE THE INGESTION REPORT
 
 Produce a structured report that includes:
 
@@ -400,12 +489,15 @@ Produce a structured report that includes:
 2. Project Summary
 3. Source Inventory Summary
 4. Source Classification Summary
-5. Knowledge Vault Changes
-6. Legacy Documentation Handling
-7. Code ↔ Documentation Findings
-8. Open Questions / Uncertainties
-9. Recommended Next Actions
-10. Post-Ingest Source-of-Truth Statement
+5. Knowledge Vault Changes (list of files created or modified)
+6. Relation Map Summary
+7. Graph Status (`none` / `partial` / `valid`) with justification
+8. Weak or Unconnected Documents
+9. Legacy Documentation Handling
+10. Code ↔ Documentation Findings
+11. Open Questions / Uncertainties
+12. Recommended Next Actions
+13. Post-Ingest Source-of-Truth Statement
 
 The report must make it easy for the user to answer:
 - What did you learn?
@@ -422,10 +514,13 @@ When this skill completes successfully, the agent must provide:
 
 1. a short executive summary,
 2. the ingestion report,
-3. the list of created/updated Knowledge Vault files,
-4. the list of legacy-handling recommendations or changes,
-5. the list of code ↔ documentation mismatches,
-6. the recommended next action.
+3. **files changed** — the explicit list of created or updated Knowledge Vault files,
+4. **relation map summary** — typed edges added or validated, by source document,
+5. **graph status** — one of `none` / `partial` / `valid`, with a one-line justification,
+6. **weak or unconnected documents** — list of documents lacking sufficient inbound or outbound relations after the pass,
+7. the list of legacy-handling recommendations or changes,
+8. the list of code ↔ documentation mismatches,
+9. the recommended next action.
 
 ---
 

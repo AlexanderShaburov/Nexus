@@ -3,9 +3,18 @@ type: glossary
 scope: system
 status: approved
 created: 2026-04-19
-updated: 2026-04-22
+updated: 2026-05-04
 source_of_truth: true
 tags: [glossary, terminology, canonical]
+---
+
+## Relations
+
+- depends_on:
+  - [ADR — Rename SOKI to Nexus](../decisions/adr--system--rename-soki-to-nexus.md) — registers the canonical system name fixed here.
+- relates_to:
+  - [Knowledge Vault Specification](../specs/spec--system--knowledge-vault.md) — defines `Knowledge Vault` as a canonical term used in this glossary.
+
 ---
 
 # Terminology Glossary

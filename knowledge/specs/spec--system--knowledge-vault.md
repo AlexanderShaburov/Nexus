@@ -3,9 +3,21 @@ type: spec
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-04-22
+updated: 2026-05-04
 source_of_truth: true
 tags: [knowledge-vault, structure, ontology]
+---
+
+## Relations
+
+- depends_on:
+  - [Document Frontmatter Specification](spec--system--document-frontmatter.md) — every vault document must satisfy the frontmatter contract.
+- constrains:
+  - [Knowledge-Driven Task Orchestration Specification](spec--system--knowledge-driven-task-orchestration.md) — the orchestration spec operates over this vault structure.
+  - [Knowledge Graph Relations Specification](spec--system--knowledge-graph-relations.md) — the relation graph is layered on top of this structure.
+- relates_to:
+  - [Overall Structure (Nexus System)](../architecture/architecture--system--overall-structure.md) — the vault is one of the runtime components.
+
 ---
 
 # Knowledge Vault Specification

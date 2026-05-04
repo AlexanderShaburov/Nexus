@@ -4,12 +4,22 @@ id: adr--system--rename-soki-to-nexus
 type: decision
 status: accepted
 created: 2026-04-22
+updated: 2026-05-04
 tags:
 
 * system
 * naming
 * architecture
 * knowledge-vault
+
+---
+
+## Relations
+
+- constrains:
+  - [Terminology Glossary](../glossary/glossary--system--terminology.md) — registers the canonical name `Nexus` and retires `SOKI`.
+- relates_to:
+  - [Overall Structure (Nexus System)](../architecture/architecture--system--overall-structure.md) — names the runtime system this architecture describes.
 
 ---
 

@@ -3,9 +3,20 @@ type: spec
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-04-22
+updated: 2026-05-04
 source_of_truth: true
 tags: [knowledge, exit-gate, lifecycle, writeback]
+---
+
+## Relations
+
+- depends_on:
+  - [Knowledge-Driven Task Orchestration Specification](spec--system--knowledge-driven-task-orchestration.md) — the closure block is how the Sync obligation is enforced per turn.
+- relates_to:
+  - [Lifecycle Gates Invariant](../invariants/invariant--system--lifecycle-gates.md) — the exit gate is the third non-negotiable gate.
+  - [Context Decision Gate Specification](spec--system--context-decision-gate.md) — paired with the entry decision; both required per turn.
+  - [Session Bootstrap Specification](spec--system--session-bootstrap.md) — closes the lifecycle loop opened by bootstrap.
+
 ---
 
 # Exit Gate Specification

@@ -3,9 +3,20 @@ type: spec
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-04-19
+updated: 2026-05-04
 source_of_truth: true
 tags: [knowledge, decision-gate, lifecycle]
+---
+
+## Relations
+
+- depends_on:
+  - [Knowledge-Driven Task Orchestration Specification](spec--system--knowledge-driven-task-orchestration.md) — the per-turn decision implements the Retrieve obligation at turn granularity.
+- relates_to:
+  - [Lifecycle Gates Invariant](../invariants/invariant--system--lifecycle-gates.md) — the decision gate is the second non-negotiable gate.
+  - [Exit Gate Specification](spec--system--exit-gate.md) — paired closure gate; both must be present per turn.
+  - [Overall Structure (Nexus System)](../architecture/architecture--system--overall-structure.md) — the prompt and tool gates realize this spec.
+
 ---
 
 # Context Decision Gate Specification

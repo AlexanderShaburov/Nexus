@@ -2,9 +2,23 @@
 type: spec
 scope: system
 status: approved
-date: 2026-04-17
+created: 2026-04-17
+updated: 2026-05-04
 source_of_truth: true
 tags: [knowledge, orchestration]
+---
+
+## Relations
+
+- depends_on:
+  - [Knowledge Vault Specification](spec--system--knowledge-vault.md) — defines the structure this spec assumes for storing knowledge.
+  - [Knowledge Graph Relations Specification](spec--system--knowledge-graph-relations.md) — defines the relation contract used during the Retrieve step.
+- constrains:
+  - [Session Bootstrap Specification](spec--system--session-bootstrap.md) — bootstrap is the entry mechanism for the Retrieve obligation.
+  - [Exit Gate Specification](spec--system--exit-gate.md) — exit gate enforces the Sync obligation.
+- relates_to:
+  - [Context Decision Gate Specification](spec--system--context-decision-gate.md) — gates the per-turn decision to consult the vault.
+
 ---
 
 # Knowledge-Driven Task Orchestration Specification
@@ -87,7 +101,29 @@ Claude MUST NOT proceed with non-trivial work without minimal sufficient context
 
 ---
 
-## 2. Ground (Context Application)
+## 2. Knowledge Graph Navigation
+
+The Knowledge Vault MUST be treated as a graph of related knowledge documents,
+not merely as an index-based document collection.
+
+During Retrieve, Claude MUST:
+
+- start from the index or other known entry points;
+- inspect explicitly declared relations inside retrieved documents;
+- follow relevant relations when they are necessary to obtain sufficient context;
+- prefer declared relations over filename similarity or uncontrolled search;
+- stop traversal when sufficient task context has been obtained.
+
+Claude MUST NOT rely only on the top-level index when related documents declare
+additional relevant context.
+
+Relation creation and validation are governed by:
+
+- spec--system--knowledge-graph-relations.md
+
+---
+
+## 3. Ground (Context Application)
 
 During work, Claude MUST:
 
@@ -103,7 +139,7 @@ If a task appears to contradict existing knowledge:
 
 ---
 
-## 3. Sync (Knowledge Writeback)
+## 4. Sync (Knowledge Writeback)
 
 After completing work, Claude MUST evaluate whether knowledge changes occurred.
 

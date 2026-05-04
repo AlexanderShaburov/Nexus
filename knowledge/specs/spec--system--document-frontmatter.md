@@ -3,9 +3,18 @@ type: spec
 scope: system
 status: approved
 created: 2026-04-17
-updated: 2026-04-22
+updated: 2026-05-04
 source_of_truth: true
 tags: [frontmatter, metadata, kb-system]
+---
+
+## Relations
+
+- constrains:
+  - [Knowledge Vault Specification](spec--system--knowledge-vault.md) — every vault document must satisfy this contract.
+- relates_to:
+  - [Knowledge Graph Relations Specification](spec--system--knowledge-graph-relations.md) — relation declarations sit alongside frontmatter on every document.
+
 ---
 
 # Document Frontmatter Specification

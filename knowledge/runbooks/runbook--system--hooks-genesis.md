@@ -1,3 +1,27 @@
+---
+type: prompt
+status: archived
+created: 2026-04-18
+updated: 2026-05-04
+source_of_truth: false
+tags:
+  - system
+  - hooks
+  - genesis
+  - historical
+  - migration-origin
+---
+
+## Relations
+
+- relates_to:
+  - [Overall Structure (Nexus System)](../architecture/architecture--system--overall-structure.md) — this prompt produced the hook architecture described there.
+  - [Session Bootstrap Specification](../specs/spec--system--session-bootstrap.md) — the bootstrap behavior this prompt asked to enforce.
+  - [Context Decision Gate Specification](../specs/spec--system--context-decision-gate.md) — the decision gate this prompt asked to enforce.
+  - [Exit Gate Specification](../specs/spec--system--exit-gate.md) — the exit gate this prompt asked to enforce.
+
+---
+
 # Prompt for Claude — SOKI Hooks Implementation + System Review
 
 You are provided with a complete set of documents describing a Knowledge-Driven workflow system (SOKI) and the structure of a Knowledge Vault.

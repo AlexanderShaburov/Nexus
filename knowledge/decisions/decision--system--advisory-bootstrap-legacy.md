@@ -3,9 +3,18 @@ type: decision
 scope: system
 status: deprecated
 created: 2026-04-17
-updated: 2026-04-22
+updated: 2026-05-04
 source_of_truth: false
 tags: [decision, legacy, bootstrap, advisory, deprecated]
+---
+
+## Relations
+
+- relates_to:
+  - [Session Bootstrap Specification](../specs/spec--system--session-bootstrap.md) — the spec that supersedes this advisory approach.
+  - [Knowledge-Driven Task Orchestration Specification](../specs/spec--system--knowledge-driven-task-orchestration.md) — the spec that supersedes this advisory approach.
+  - [Lifecycle Gates Invariant](../invariants/invariant--system--lifecycle-gates.md) — the enforced gates that replace this advisory regime.
+
 ---
 
 # Decision: Advisory Bootstrap (Legacy, Superseded by Nexus)

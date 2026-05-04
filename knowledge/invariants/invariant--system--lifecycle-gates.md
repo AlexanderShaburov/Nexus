@@ -3,9 +3,20 @@ type: invariant
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-04-19
+updated: 2026-05-04
 source_of_truth: true
 tags: [invariant, lifecycle, gates, nexus]
+---
+
+## Relations
+
+- constrains:
+  - [Session Bootstrap Specification](../specs/spec--system--session-bootstrap.md) — bootstrap is the first non-negotiable gate.
+  - [Context Decision Gate Specification](../specs/spec--system--context-decision-gate.md) — the per-turn gate is non-negotiable.
+  - [Exit Gate Specification](../specs/spec--system--exit-gate.md) — the closure gate is non-negotiable.
+- relates_to:
+  - [Overall Structure (Nexus System)](../architecture/architecture--system--overall-structure.md) — runtime hooks realize these gates.
+
 ---
 
 # Invariant: Lifecycle Gates

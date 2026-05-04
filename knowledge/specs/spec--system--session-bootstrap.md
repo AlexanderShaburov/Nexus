@@ -8,7 +8,17 @@ tags:
 - bootstrap
 - session
 type: spec
-updated: 2026-04-19
+updated: 2026-05-04
+---
+
+## Relations
+
+- depends_on:
+  - [Knowledge-Driven Task Orchestration Specification](spec--system--knowledge-driven-task-orchestration.md) — bootstrap is the entry mechanism for the Retrieve obligation.
+- relates_to:
+  - [Lifecycle Gates Invariant](../invariants/invariant--system--lifecycle-gates.md) — bootstrap is the first non-negotiable gate.
+  - [Overall Structure (Nexus System)](../architecture/architecture--system--overall-structure.md) — bootstrap is realized by the SessionStart hook described there.
+
 ---
 
 ## BOOTSTRAP EXECUTION --- REQUIRED

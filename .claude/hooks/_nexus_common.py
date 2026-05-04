@@ -1,7 +1,7 @@
 """Shared helpers for Nexus hooks.
 
 Keeps scripts concise and JSON-handling robust across hooks.
-Not a public API — consumed only by the .sh wrappers in this directory.
+Not a public API — consumed only by the .py wrappers in this directory.
 """
 
 from __future__ import annotations
