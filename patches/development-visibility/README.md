@@ -1,15 +1,17 @@
-# Nexus Patch — Development-Phase Knowledge Visibility (v1.0.0)
+# Nexus Patch — Development-Phase Knowledge Visibility (v1.1.0)
 
 This patch retrofits the **knowledge visibility** mechanism into an existing Nexus-based project. After applying, architecture reviews, gap analyses, and roadmap planning include active design work (drafts, roadmaps, proposals, in-review specs) — not just authoritative documents.
 
 | | |
 |---|---|
 | Patch ID | `development-visibility` |
-| Patch version | `1.0.0` |
+| Patch version | `1.1.0` |
 | Source commit | `445dcd0c83f54d0d49d5048cf4f2b6217df2d12f` |
 | Source repo | Nexus |
 | Status | Production |
 | Required runtime | `python3` ≥ 3.10 (already required by Nexus hooks) |
+
+> **What changed in v1.1.0:** added the operator post-apply verification prompt at `prompts/post-apply-development-visibility-migration.md`. Payload and surgical edits are byte-identical to v1.0.0; bundle behaviour is unchanged.
 
 For the case note, alternatives, and rationale, see (after applying) `knowledge/decisions/decision--system--development-visibility-failure.md`.
 
@@ -29,6 +31,10 @@ unzip nexus-development-visibility-patch.zip
 
 # 4. Reload hooks in Claude Code
 #    (in the CC TUI)  /hooks
+
+# 5. Paste the post-apply verification prompt into Claude Code
+#    (read-only first pass: verify, inventory, smoke-test, readiness report)
+cat ./patches/development-visibility/prompts/post-apply-development-visibility-migration.md
 ```
 
 ---
@@ -110,10 +116,12 @@ PYTHON=/opt/homebrew/bin/python3 ./apply.sh --apply
 ```
 patches/development-visibility/
 ├── README.md              ← this file
-├── PATCH_MANIFEST.yaml    ← machine-readable manifest (patch id, files, strategy, safety)
-├── manifest.txt           ← human-readable file list + SHA-256 checksums
+├── PATCH_MANIFEST.yaml    ← machine-readable manifest (patch id, files, strategy, safety, prompts)
+├── manifest.txt           ← human-readable file list + SHA-256 checksums (payload only)
 ├── apply.sh               ← bash entry point
 ├── apply.py               ← python worker (does all real work)
+├── prompts/               ← operator-facing prompts, NOT copied into target
+│   └── post-apply-development-visibility-migration.md
 └── payload/               ← 6 new files copied verbatim into the target
     ├── docs/
     │   └── development-visibility-patch-report.md
@@ -141,15 +149,33 @@ If validation fails, the script exits 5 and reports which check failed.
 
 ---
 
-## After applying — agent smoke test
+## After applying — operator post-apply prompt (recommended)
 
-The patch wires the new behaviour into the runtime, but **agent behaviour change must be verified by actually running review prompts** against the patched project. See Section E of `knowledge/runbooks/runbook--system--development-visibility-migration.md` (newly copied into your project). Minimum:
+After `apply.sh --apply` succeeds AND you have reloaded hooks with `/hooks`, paste the contents of
+
+```
+prompts/post-apply-development-visibility-migration.md
+```
+
+into Claude Code as a single message. This is a **read-only first pass** that:
+
+1. verifies patch installation (10 PASS/FAIL checks);
+2. confirms STEP 3 is visible in the bootstrap injection;
+3. inventories every doc into Binding / Development / Historical State;
+4. flags any invalid `knowledge_visibility` combinations;
+5. recommends per-document frontmatter additions (grouped by target class);
+6. runs an architecture-review smoke test with the four-way gap classification;
+7. produces a Readiness Report.
+
+The agent must NOT modify any file during this pass. Mutating actions (frontmatter migration per Section C of the migration runbook, and the subsequent commit) are deliberate operator-authorized follow-ups.
+
+### Minimal smoke test (if you want to skip the full prompt)
 
 ```text
 > Tell me what specs are missing from this project. Use the architecture-review workflow.
 ```
 
-The agent's response must include `## Binding State`, `## Development State`, and `## Gap Classification` with every finding classified as one of the four classes.
+The agent's response must include `## Binding State`, `## Development State`, and `## Gap Classification` with every finding classified as one of the four classes. If it does not, the patch is not fully active — re-run `/hooks` after `apply.sh --apply`.
 
 ---
 

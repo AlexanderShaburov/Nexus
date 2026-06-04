@@ -352,9 +352,34 @@ This activates the new runtime behaviour.
 
 ---
 
-## Step 5 — Verify the patch took effect
+## Step 5 — Paste the post-apply verification prompt
 
-Run a quick agent smoke test (specific tests live in the patch's own README and in the companion migration runbook):
+Most patches ship a ready-made verification prompt under `prompts/` in the bundle. For the development-visibility patch:
+
+```
+patches/development-visibility/prompts/post-apply-development-visibility-migration.md
+```
+
+Open that file, copy the block between `--- BEGIN PROMPT ---` and `--- END PROMPT ---`, and paste it into Claude Code as a single message.
+
+This is a **READ-ONLY first pass**. The agent will:
+
+- verify the patch installation (10 PASS/FAIL checks);
+- inventory the project into Binding / Development / Historical State;
+- flag any invalid frontmatter combinations;
+- recommend per-document `knowledge_visibility:` additions;
+- run an architecture-review smoke test with the four-way gap classification;
+- emit a Readiness Report (READY / NOT READY for migration + commit).
+
+👉 The agent must NOT modify any file during this pass. Mutating actions (frontmatter migration, the commit) are a separate operator-authorized step.
+
+If the bundle does NOT ship a `prompts/` directory, fall back to the minimal smoke test below.
+
+---
+
+## Step 5b — Minimal smoke test (fallback)
+
+If you skipped the post-apply prompt:
 
 ```text
 > Tell me what specs are missing from this project. Use the architecture-review workflow.
@@ -364,7 +389,20 @@ For the development-visibility patch, the response MUST include `## Binding Stat
 
 ---
 
-## Step 6 — What to do if the patch refuses
+## Step 6 — Act on the Readiness Report
+
+When the post-apply prompt finishes and reports **READY**:
+
+- review the recommended frontmatter additions;
+- author a follow-up prompt that authorizes the agent to apply Section C of the migration runbook (frontmatter migration);
+- review the agent's changes;
+- commit.
+
+When the report says **NOT READY**, resolve the blocking items it names (re-run hooks, manually apply refused edits per Section D, fix invalid combinations) and re-run the prompt.
+
+---
+
+## Step 7 — What to do if the patch refuses
 
 The patch may refuse a file if its anchors were already removed by heavy local customization (most common on `CLAUDE.md`). In that case:
 

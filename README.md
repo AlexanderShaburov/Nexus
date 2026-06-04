@@ -364,9 +364,11 @@ The patch's own `README.md` (inside the bundle) documents the flags, the exit co
 
 ## Patches shipped with this repository
 
-| Patch | Description |
-|---|---|
-| `patches/development-visibility/` | Adds the three knowledge-visibility classes (binding / development / historical), the dual-analysis review workflow, and the four-way gap classification. See `patches/development-visibility/README.md`. |
+| Patch | Version | Description |
+|---|---|---|
+| `patches/development-visibility/` | 1.1.0 | Adds the three knowledge-visibility classes (binding / development / historical), the dual-analysis review workflow, and the four-way gap classification. Ships a post-apply verification prompt under `prompts/`. See `patches/development-visibility/README.md`. |
+
+Each bundle ships an operator post-apply prompt (under `prompts/`) that performs a read-only verification + inventory + smoke test against the patched project. Paste it into Claude Code after `apply.sh --apply` and `/hooks`.
 
 ## Building a distributable zip
 

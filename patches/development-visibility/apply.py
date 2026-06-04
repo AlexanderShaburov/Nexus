@@ -26,9 +26,10 @@ import sys
 # ---------------------------------------------------------------------------
 
 PATCH_ID = "development-visibility"
-PATCH_VERSION = "1.0.0"
+PATCH_VERSION = "1.1.0"
 SOURCE_COMMIT = "445dcd0c83f54d0d49d5048cf4f2b6217df2d12f"
 PATCH_TITLE = "Development-Phase Knowledge Visibility"
+POST_APPLY_PROMPT = "prompts/post-apply-development-visibility-migration.md"
 
 # Files that are entirely new (no upstream version exists in older projects).
 # Copied from payload/ verbatim. If the target file exists and matches byte-for-byte
@@ -569,7 +570,15 @@ def main() -> int:
     elif results["errors"]:
         print("Errors occurred during apply. See messages above.")
     else:
-        print("Patch applied successfully. Reload Claude Code hooks with /hooks.")
+        print("Patch applied successfully.")
+        print()
+        print("Next steps:")
+        print("  1. In Claude Code, run:  /hooks")
+        print("     (reloads hook configuration; required for STEP 3 to take effect)")
+        print(f"  2. Paste the post-apply verification prompt into Claude Code:")
+        print(f"     {(pathlib.Path(args.bundle_dir) / POST_APPLY_PROMPT).resolve()}")
+        print("     This is a READ-ONLY first pass: verify, inventory, smoke-test.")
+        print("     Mutating frontmatter / committing is a separate operator step.")
 
     return rc
 

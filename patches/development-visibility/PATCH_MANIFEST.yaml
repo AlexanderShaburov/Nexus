@@ -6,12 +6,25 @@
 # Filename convention is fixed: PATCH_MANIFEST.yaml in the patch bundle root.
 
 patch_id: development-visibility
-patch_version: 1.0.0
+patch_version: 1.1.0
 patch_title: Development-Phase Knowledge Visibility
 source_commit: 445dcd0c83f54d0d49d5048cf4f2b6217df2d12f
 source_repo: Nexus
 created: 2026-06-04
+updated: 2026-06-04
 upstream_runbook: knowledge/runbooks/runbook--system--development-visibility-migration.md
+
+# Changelog (newest first).
+changelog:
+  - version: 1.1.0
+    date: 2026-06-04
+    change: >-
+      Add operator-facing post-apply verification prompt under prompts/.
+      No change to payload or surgical edits; bundle behaviour identical to
+      v1.0.0.
+  - version: 1.0.0
+    date: 2026-06-04
+    change: Initial bundle.
 
 # What this patch makes visible / enforceable in the target project, in one line.
 behavioural_summary: >-
@@ -147,3 +160,23 @@ exit_codes:
   3: payload or target file missing
   4: internal error or missing python3
   5: post-apply validation failed
+
+# Operator prompts shipped with this bundle (under prompts/).
+# These are NOT copied into the target project; the operator pastes them into
+# Claude Code AFTER apply.sh --apply completes successfully.
+operator_prompts:
+  - path: prompts/post-apply-development-visibility-migration.md
+    when: after `apply.sh --apply` succeeds AND `/hooks` has been reloaded
+    mode: read-only
+    purpose: >-
+      First-pass verification + per-document visibility inventory + frontmatter
+      recommendations + architecture-review smoke test + readiness report.
+      Must not modify any file; mutating actions are a separate operator
+      decision per Section C of the migration runbook.
+    produces:
+      - per-check PASS/FAIL list (10 checks)
+      - Binding / Development / Historical State enumerations
+      - invalid-combination report
+      - frontmatter-addition recommendations grouped by target class
+      - architecture-review smoke test with four-way gap classification
+      - Readiness Report (READY / NOT READY for migration + commit)
