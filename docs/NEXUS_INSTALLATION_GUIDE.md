@@ -275,6 +275,116 @@ DO NOT use it:
 
 ---
 
+# 🔄 PART 6 — Updating an EXISTING Nexus project
+
+This part is the **only** correct way to upgrade an existing Nexus-based project to a newer Nexus version. **Do not** re-copy the runtime — you would overwrite the project's `CLAUDE.md` and the navigation index.
+
+---
+
+## When to use this
+
+Use this part when ALL of the following are true:
+
+- The project ALREADY has Nexus installed.
+- The project has `.claude/hooks/nexus-*.py`, `.nexus/`, and `knowledge/`.
+- A newer Nexus release ships a patch bundle for the feature you need.
+
+👉 If the project does NOT have Nexus yet, use Part 1 + Part 3 instead.
+
+---
+
+## Step 1 — Obtain the patch bundle
+
+Patch bundles are shipped under `patches/<patch-id>/` in this repository, and as distributable zips when prepared by a release manager. For example:
+
+```
+patches/development-visibility/
+nexus-development-visibility-patch-v1.0.0.zip
+```
+
+Copy the bundle (or unzip it) into your project root. The leading directory after unzip will be named `nexus-<patch-id>-patch/`.
+
+---
+
+## Step 2 — Dry-run first (default)
+
+```bash
+./patches/development-visibility/apply.sh --project-root .
+```
+
+This shows EXACTLY which files would change. Nothing is modified.
+
+If the bundle was unzipped to `nexus-<patch-id>-patch/`:
+
+```bash
+./nexus-development-visibility-patch/apply.sh --project-root .
+```
+
+---
+
+## Step 3 — Apply
+
+```bash
+./patches/development-visibility/apply.sh --project-root . --apply
+```
+
+The script:
+
+- creates a timestamped backup at `.nexus/backups/<patch-id>-<YYYYMMDD-HHMMSS>/`;
+- copies new files into the project (skips if identical, backs up if different);
+- applies anchor-based surgical edits to system files (idempotent);
+- refuses to corrupt heavily-customized files (reports them and exits 1);
+- validates the result.
+
+👉 Re-running after success is a SAFE no-op. The script is idempotent.
+
+---
+
+## Step 4 — Reload Claude Code hooks
+
+In Claude Code:
+
+```
+/hooks
+```
+
+This activates the new runtime behaviour.
+
+---
+
+## Step 5 — Verify the patch took effect
+
+Run a quick agent smoke test (specific tests live in the patch's own README and in the companion migration runbook):
+
+```text
+> Tell me what specs are missing from this project. Use the architecture-review workflow.
+```
+
+For the development-visibility patch, the response MUST include `## Binding State`, `## Development State`, and `## Gap Classification` with every finding classified.
+
+---
+
+## Step 6 — What to do if the patch refuses
+
+The patch may refuse a file if its anchors were already removed by heavy local customization (most common on `CLAUDE.md`). In that case:
+
+- the script exits 1 and names the refused file;
+- the file is NOT modified;
+- follow the manual section of the patch's companion runbook (e.g. `knowledge/runbooks/runbook--system--development-visibility-migration.md`) for that file;
+- re-run the patch — already-correct files are skipped via idempotency markers.
+
+---
+
+## Patch vs install — quick reference
+
+| Situation | Use |
+|---|---|
+| Brand-new project | **Part 1 + Part 2** (install) |
+| Existing project, no Nexus yet | **Part 1 + Part 3** (install + ingest) |
+| Existing Nexus project, feature added upstream | **Part 6** (patch, this part) |
+
+---
+
 # 🎯 FINAL PRINCIPLE
 
 > You do not manage the Knowledge Vault manually.  

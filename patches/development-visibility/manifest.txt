@@ -1,0 +1,9 @@
+# Nexus development-visibility patch — payload integrity manifest
+# Each line: SHA-256  size  path-relative-to-payload/
+
+bd39f9b860994d05a8e71f0547faa74113f3fd9d24a287c360736fdeffcc368a      6019  docs/development-visibility-patch-report.md
+07c0f44ec829dad8ac8a59e53b80af0d6df3644ccc934dd322c6fbc72d4e9f3b      6691  knowledge/decisions/decision--system--development-visibility-failure.md
+bc20ca6093f7814022999a4f41c14a8ade5f808c640fcaa0bc225feef50de432      3451  knowledge/invariants/invariant--system--review-classification.md
+57e02f52c7fb84d027c5a3f9e1772288da4a68a7f39ed3bf9171bffeaa2888cd     15026  knowledge/runbooks/runbook--system--development-visibility-migration.md
+e045af60eb7525f3a2081efaca0ea6d29f5e17ccc2140db20d95f1e9a83d17e3      6955  knowledge/specs/spec--system--architecture-review.md
+d257c842e4d3184985ab47e72a0d80b2248149d82d07fa12ce25761e37191a64      7283  knowledge/specs/spec--system--knowledge-visibility.md

@@ -253,6 +253,8 @@ Once the session starts, Nexus bootstrap will require the startup reading set be
 
 Use this option when the project already contains code, documents, legacy notes, or inconsistent project memory.
 
+> If the existing project already has Nexus installed and you only need to bring it up to date with a newer Nexus version, **don't reinstall** — use a **patch bundle** instead. See [Updating an existing Nexus project](#updating-an-existing-nexus-project) below.
+
 ### Step 1 — Install the same runtime files
 
 Copy into the existing repository root:
@@ -315,6 +317,67 @@ After ingestion, the intended model is:
 
 - `knowledge/` = canonical operational memory
 - old docs outside `knowledge/` = legacy, raw source, historical, or archive
+
+---
+
+# Updating an existing Nexus project
+
+If a project already has Nexus installed (it has `.claude/hooks/nexus-*.py`, `.nexus/`, and `knowledge/`), do not reinstall by re-copying the runtime — you will overwrite project-specific content in `CLAUDE.md` and the navigation index. Use a **patch bundle** instead.
+
+## What a patch bundle is
+
+A patch bundle is a self-contained directory under `patches/<patch-id>/` that ships:
+
+- new files to add to the target project (`payload/`);
+- surgical edits for existing system files (anchor-based; never overwrites project-local content);
+- an `apply.sh` / `apply.py` worker;
+- a human-readable `README.md` and `manifest.txt`;
+- a machine-readable `PATCH_MANIFEST.yaml` describing patch id, version, source commit, file strategy, and safety properties.
+
+Patch bundles are dry-run by default, idempotent, refuse to corrupt heavily-customized files, and create timestamped backups before mutating anything.
+
+## When to use install vs patch
+
+| Situation | Use |
+|---|---|
+| Brand-new repository, no Nexus yet | **Install** (Option A above) |
+| Existing project with no Nexus yet | **Install + ingest** (Option B above) |
+| Existing Nexus project, new Nexus feature available | **Patch** (this section) |
+| Need to inventory existing project drafts after a patch | The patch's companion runbook under `knowledge/runbooks/` |
+
+## How to apply a patch bundle
+
+```bash
+# from the existing target project's root
+unzip nexus-<patch-id>-patch-v<version>.zip
+./nexus-<patch-id>-patch/apply.sh                # dry-run (default)
+./nexus-<patch-id>-patch/apply.sh --apply        # actually apply
+```
+
+Then reload Claude Code hooks (in the CC TUI):
+
+```text
+/hooks
+```
+
+The patch's own `README.md` (inside the bundle) documents the flags, the exit codes, the validation it performs, and the post-patch operator smoke tests.
+
+## Patches shipped with this repository
+
+| Patch | Description |
+|---|---|
+| `patches/development-visibility/` | Adds the three knowledge-visibility classes (binding / development / historical), the dual-analysis review workflow, and the four-way gap classification. See `patches/development-visibility/README.md`. |
+
+## Building a distributable zip
+
+The patch bundle ships as a directory; producers turn it into a distributable zip via:
+
+```bash
+./tools/build-patch-zip.sh patches/development-visibility
+# → dist/nexus-development-visibility-patch-v1.0.0.zip
+```
+
+Output goes to `dist/` by default; pass a second argument to override.
 
 ---
 

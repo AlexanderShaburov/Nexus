@@ -1,0 +1,149 @@
+---
+# Machine-readable manifest for the Nexus 'development-visibility' patch.
+# Consumers may load this to inventory applied patches and to audit which files
+# a given patch touched.
+#
+# Filename convention is fixed: PATCH_MANIFEST.yaml in the patch bundle root.
+
+patch_id: development-visibility
+patch_version: 1.0.0
+patch_title: Development-Phase Knowledge Visibility
+source_commit: 445dcd0c83f54d0d49d5048cf4f2b6217df2d12f
+source_repo: Nexus
+created: 2026-06-04
+upstream_runbook: knowledge/runbooks/runbook--system--development-visibility-migration.md
+
+# What this patch makes visible / enforceable in the target project, in one line.
+behavioural_summary: >-
+  Architecture reviews, gap analyses, and roadmap planning MUST consider
+  development-class documents (drafts, roadmaps, proposals, in-review specs)
+  alongside binding documents. Every gap MUST be classified as Truly Missing,
+  Exists As Draft, Exists But Not Normalized, or Superseded Gap.
+
+# Pre-flight checks performed by apply.sh / apply.py before any mutation.
+preflight_checks:
+  - target has .claude/hooks/nexus-bootstrap.py
+  - target has .nexus/ directory
+  - target has knowledge/ directory
+
+# Files added wholesale (copied from payload/). These are entirely new files.
+# strategy: copy-if-absent-else-replace-with-backup.
+files_added:
+  - path: knowledge/invariants/invariant--system--review-classification.md
+    payload: payload/knowledge/invariants/invariant--system--review-classification.md
+    strategy: copy-if-absent-else-replace-with-backup
+    rationale: Non-negotiable rule; auto-loaded at every session bootstrap.
+  - path: knowledge/specs/spec--system--knowledge-visibility.md
+    payload: payload/knowledge/specs/spec--system--knowledge-visibility.md
+    strategy: copy-if-absent-else-replace-with-backup
+    rationale: Defines the three visibility classes and the knowledge_visibility field.
+  - path: knowledge/specs/spec--system--architecture-review.md
+    payload: payload/knowledge/specs/spec--system--architecture-review.md
+    strategy: copy-if-absent-else-replace-with-backup
+    rationale: Defines the dual-analysis review workflow and four-way gap classification.
+  - path: knowledge/decisions/decision--system--development-visibility-failure.md
+    payload: payload/knowledge/decisions/decision--system--development-visibility-failure.md
+    strategy: copy-if-absent-else-replace-with-backup
+    rationale: Case note + rejected alternatives + chosen rationale.
+  - path: knowledge/runbooks/runbook--system--development-visibility-migration.md
+    payload: payload/knowledge/runbooks/runbook--system--development-visibility-migration.md
+    strategy: copy-if-absent-else-replace-with-backup
+    rationale: Manual migration runbook for sections this patch does not automate.
+  - path: docs/development-visibility-patch-report.md
+    payload: payload/docs/development-visibility-patch-report.md
+    strategy: copy-if-absent-else-replace-with-backup
+    rationale: Audit / traceability report describing what changed and why.
+
+# Files modified in place using anchor-based surgical edits.
+# strategy: anchor-replace OR anchor-insert-after; idempotency markers ensure
+# re-running is a no-op; missing anchors cause the file to be refused (never
+# corrupted).
+files_modified:
+  - path: CLAUDE.md
+    strategy: anchor-insert-after
+    edits: 1
+    idempotency_marker: "## Knowledge Visibility (review"
+    risk: high
+    notes: >-
+      CLAUDE.md is typically project-customized. Patch inserts a new section
+      after the existing "Read Priority" paragraph; project content is preserved.
+      If anchor is absent (heavily rewritten section), patch refuses and the
+      operator must apply Section D of the migration runbook manually.
+
+  - path: knowledge/index/index--system--project-navigation.md
+    strategy: anchor-insert-after
+    edits: 2
+    idempotency_marker: "[Knowledge Visibility]"
+    risk: high
+    notes: >-
+      The navigation index is project-extensible. Patch appends two entries
+      under "Canonical System Specs" (Knowledge Visibility + Architecture
+      Review) and one entry under "Core Invariants" (Review Classification).
+      Project entries are preserved.
+
+  - path: knowledge/specs/spec--system--document-frontmatter.md
+    strategy: anchor-replace
+    edits: 2
+    idempotency_marker: "### knowledge_visibility (optional"
+    risk: low
+    notes: >-
+      System spec; rarely extended locally. Registers the knowledge_visibility
+      field and adds a development-visibility example.
+
+  - path: knowledge/specs/spec--system--session-bootstrap.md
+    strategy: anchor-replace
+    edits: 1
+    idempotency_marker: "STEP 3 — ACTIVE DESIGN TRACKS"
+    risk: low
+    notes: >-
+      System spec; rarely extended locally. Inserts STEP 3 (ACTIVE DESIGN
+      TRACKS) between Canonical Constraints and Operational Mode.
+
+  - path: .claude/hooks/nexus-bootstrap.py
+    strategy: anchor-replace
+    edits: 1
+    idempotency_marker: "STEP 3 — ACTIVE DESIGN TRACKS"
+    risk: low
+    notes: >-
+      System hook; usually copied verbatim. Inserts the STEP 3 block into the
+      lines[] list of the bootstrap context, between STEP 2 closing and the
+      ENFORCEMENT marker.
+
+# Files explicitly NOT modified by this patch.
+files_not_modified:
+  - .claude/hooks/_nexus_common.py
+  - .claude/hooks/nexus-prompt-gate.py
+  - .claude/hooks/nexus-tool-gate.py
+  - .claude/hooks/nexus-exit-gate.py
+  - .claude/settings.json
+  - .nexus/state.json
+  - .gitignore
+  - any project knowledge document outside the system specs listed above
+
+# What apply.py validates after a successful --apply run.
+post_apply_validation:
+  - bootstrap hook contains 'STEP 3 — ACTIVE DESIGN TRACKS'
+  - each new file is present with knowledge_visibility=binding and source_of_truth=true
+  - CLAUDE.md references both new specs
+
+# Safety properties.
+safety_properties:
+  dry_run_default: true
+  idempotent: true
+  partial_application_prevented: true
+  backup_before_modify: true
+  backup_location_default: .nexus/backups/<patch_id>-<YYYYMMDD-HHMMSS>/
+  refuses_on_missing_anchor: true
+  refuses_on_ambiguous_anchor: true
+  promotes_drafts_to_binding: false
+  marks_drafts_source_of_truth: false
+  deletes_files: false
+
+# Exit-code contract for tooling integration.
+exit_codes:
+  0: success or successful dry-run
+  1: some edits refused (manual patch needed for those files)
+  2: target does not look like a Nexus project
+  3: payload or target file missing
+  4: internal error or missing python3
+  5: post-apply validation failed
