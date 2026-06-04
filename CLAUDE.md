@@ -47,6 +47,14 @@ Read these on every session start (Session Bootstrap):
 
 Use the navigation index (`knowledge/index/index--system--project-navigation.md`) to locate documents structurally. Grep is a fallback, not a primary lookup.
 
+## Knowledge Visibility (review / gap-analysis)
+
+When performing review-class tasks ("what specs are missing?", "what gaps remain?", "what should be implemented next?", "review this architecture", "create a roadmap"), the agent MUST follow `knowledge/specs/spec--system--architecture-review.md`: enumerate **Binding State** AND **Development State** before declaring any gap, and classify every finding as one of `Truly Missing` / `Exists As Draft` / `Exists But Not Normalized` / `Superseded Gap`.
+
+The three visibility classes (binding / development / historical) and the optional `knowledge_visibility` frontmatter field are defined in `knowledge/specs/spec--system--knowledge-visibility.md`. The non-negotiable rule is `knowledge/invariants/invariant--system--review-classification.md` (auto-loaded at bootstrap).
+
+Migration for existing Nexus-based projects: `knowledge/runbooks/runbook--system--development-visibility-migration.md`.
+
 ## Writing rules (if you modify the vault)
 
 - Every document MUST satisfy `knowledge/specs/spec--system--document-frontmatter.md` (YAML block with `type`, `scope`, `status`, `created`, `updated`, `source_of_truth`, `tags`).

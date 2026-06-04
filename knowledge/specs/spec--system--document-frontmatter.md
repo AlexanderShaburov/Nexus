@@ -3,8 +3,9 @@ type: spec
 scope: system
 status: approved
 created: 2026-04-17
-updated: 2026-05-04
+updated: 2026-06-04
 source_of_truth: true
+knowledge_visibility: binding
 tags: [frontmatter, metadata, kb-system]
 ---
 
@@ -131,6 +132,21 @@ Used for:
 
 ---
 
+### knowledge_visibility (optional but recommended; extension field)
+
+Defines the **review-visibility class** of the document — orthogonal to `status` (workflow maturity) and `source_of_truth` (authoritative status).
+
+Allowed values:
+- binding — implementation-binding, authoritative.
+- development — active design work; not authoritative, but MUST be visible to architecture review, gap analysis, roadmap planning, and missing-spec analysis.
+- historical — superseded, archived, or legacy; excluded from review by default.
+
+When omitted, a conservative fallback applies (see `spec--system--knowledge-visibility.md` §"Fallback Mapping").
+
+Invalid combinations (e.g. `knowledge_visibility: binding` with `source_of_truth: false`) MUST be flagged as errors and MUST NOT be silently normalized. Full rules: `spec--system--knowledge-visibility.md`.
+
+---
+
 ## Rules
 
 1. Frontmatter MUST be present in every document.
@@ -169,7 +185,23 @@ status: approved
 created: 2026-04-17
 updated: 2026-04-17
 source_of_truth: true
+knowledge_visibility: binding
 tags: [frontmatter, metadata, kb-system]
+---
+```
+
+### Example with development visibility
+
+```yaml
+---
+type: plan
+scope: system
+status: draft
+created: 2026-06-04
+updated: 2026-06-04
+source_of_truth: false
+knowledge_visibility: development
+tags: [roadmap, draft]
 ---
 ```
 

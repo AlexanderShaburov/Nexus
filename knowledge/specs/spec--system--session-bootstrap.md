@@ -2,13 +2,14 @@
 created: 2026-04-18
 scope: system
 source_of_truth: true
+knowledge_visibility: binding
 status: approved
 tags:
 - knowledge
 - bootstrap
 - session
 type: spec
-updated: 2026-05-04
+updated: 2026-06-04
 ---
 
 ## Relations
@@ -85,6 +86,45 @@ It executes exactly once per session.
 -   knowledge/invariants/
 
 All invariants MUST be treated as non-negotiable constraints.
+
+------------------------------------------------------------------------
+
+## STEP 3 — ACTIVE DESIGN TRACKS (advisory; required when performing review tasks)
+
+Before performing **architecture review**, **gap analysis**, **roadmap
+planning**, or **missing-spec analysis**, the agent MUST also discover and
+consider documents in the **development** visibility class. These documents
+are **not** authoritative, but they must be visible to review so that
+already-drafted work is not reported as missing.
+
+Sources of development-class documents:
+
+-   `knowledge/plans/` — roadmap drafts and in-progress intent.
+-   `knowledge/sessions/` — session-derived design notes.
+-   any document with `status` of `draft`, `in-progress`, or `review`.
+-   any document with `knowledge_visibility: development`.
+
+Workflow contract for review tasks:
+
+-   `knowledge/specs/spec--system--architecture-review.md` — mandatory dual
+    analysis (Binding State + Development State) with four-way gap
+    classification.
+
+Non-negotiable rule:
+
+-   `knowledge/invariants/invariant--system--review-classification.md` — no
+    gap may be reported without examining both binding and development
+    knowledge.
+
+Classification mechanism:
+
+-   `knowledge/specs/spec--system--knowledge-visibility.md` — the three
+    visibility classes and the fallback mapping.
+
+This step is advisory at session start (it does not block bootstrap
+completion), but it is **required** whenever a review-class task is
+triggered. The Mandatory Startup Reading Set above is unchanged; this
+section names additional discovery the agent owes the review surface.
 
 ------------------------------------------------------------------------
 

@@ -3,8 +3,9 @@ type: index
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-04-22
+updated: 2026-06-04
 source_of_truth: true
+knowledge_visibility: binding
 tags: [index, navigation, routing]
 ---
 
@@ -41,12 +42,15 @@ These specs define how the vault itself and the agent lifecycle are enforced. Th
 - [Exit Gate](../specs/spec--system--exit-gate.md) — the mandatory Closure Block at end of every turn
 - [Knowledge Vault](../specs/spec--system--knowledge-vault.md) — canonical folder layout and semantic roles
 - [Document Frontmatter](../specs/spec--system--document-frontmatter.md) — YAML contract for every doc
+- [Knowledge Visibility](../specs/spec--system--knowledge-visibility.md) — the three review-visibility classes (binding / development / historical) and the `knowledge_visibility` field
+- [Architecture Review](../specs/spec--system--architecture-review.md) — mandatory dual-analysis workflow (Binding State + Development State) and four-way gap classification
 
 ---
 
 ## Core Invariants
 
 - [Lifecycle Gates](../invariants/invariant--system--lifecycle-gates.md) — Bootstrap, Decision Gate, Exit Gate are non-negotiable
+- [Review Classification](../invariants/invariant--system--review-classification.md) — no gap may be reported without examining both binding and development knowledge; every gap must be classified
 
 ---
 
