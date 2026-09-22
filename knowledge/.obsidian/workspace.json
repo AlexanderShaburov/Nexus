@@ -11,10 +11,14 @@
             "id": "68a7aa7ada5e3ba4",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "specs/spec--system--knowledge-graph-relations.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "spec--system--knowledge-graph-relations"
             }
           }
         ]
@@ -177,5 +181,7 @@
     }
   },
   "active": "68a7aa7ada5e3ba4",
-  "lastOpenFiles": []
+  "lastOpenFiles": [
+    "specs/spec--system--knowledge-driven-task-orchestration.md"
+  ]
 }
