@@ -1,8 +1,8 @@
 {
   "manifest_version": 1,
-  "nexus_version": "1.0.0",
-  "generated_from": "73850198083997cd4d74d3438d49453ba7dc0481",
-  "generated_at": "2026-09-22T14:42:58",
+  "nexus_version": "1.1.0",
+  "generated_from": "023effe07f8d3b6f4bdd3aacbf6d0d5399345746",
+  "generated_at": "2026-09-22T15:03:25",
   "entries": [
     {
       "path": ".claude/hooks/_nexus_common.py",
