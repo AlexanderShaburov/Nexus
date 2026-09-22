@@ -3,7 +3,7 @@ type: index
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-06-04
+updated: 2026-09-22
 source_of_truth: true
 knowledge_visibility: binding
 tags: [index, navigation, routing]
@@ -62,12 +62,23 @@ These specs define how the vault itself and the agent lifecycle are enforced. Th
 
 ## Runtime (hooks)
 
-Hooks live outside the vault under `.claude/hooks/` and operate against runtime state in `.nexus/`. They are **the enforcement layer** for the specs above — the specs are the contract, the hooks are the mechanism.
+Hooks live outside the vault under `.claude/hooks/` and operate against runtime state in `.nexus/`. Structural description: [Overall Structure](../architecture/architecture--system--overall-structure.md).
+
+**Enforcement layer** — these realize the lifecycle gates; the specs are the contract, the hooks are the mechanism:
 
 - `nexus-bootstrap.py` — SessionStart, PreCompact
 - `nexus-prompt-gate.py` — UserPromptSubmit
 - `nexus-tool-gate.py` — PreToolUse
 - `nexus-exit-gate.py` — Stop
+
+**Non-enforcing** — part of the runtime, but they gate nothing and block nothing:
+
+- `nexus-session-writer.py` — Stop; archives the transcript to `sessions/` (architecture §2a)
+- `nexus-vault-validator.py` — PostToolUse; advisory frontmatter validation of a document just written (architecture §2b)
+
+## Runtime (tools)
+
+- `tools/validate-vault.py` — the vault rule set and its CLI. Holds the machine-checkable form of the frontmatter, naming and visibility contracts; `nexus-vault-validator.py` is a thin adapter over it. Run `python3 tools/validate-vault.py` before declaring a vault edit finished, `--selftest` after changing a rule.
 
 ---
 

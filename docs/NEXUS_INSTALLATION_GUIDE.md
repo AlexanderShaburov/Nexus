@@ -20,9 +20,15 @@ From that repository you will copy:
 - `.claude/`
 - `.nexus/`
 - `knowledge/`
+- `tools/`
+- `docs/nexus-implementation-report.md`
 - `CLAUDE.md`
 
 👉 This repository is your **Nexus template**
+
+> **`tools/` is not optional.** `.claude/hooks/nexus-vault-validator.py` loads its rule set from `tools/validate-vault.py`. If `tools/` is missing the hook still registers and still runs — and silently does nothing, because it degrades quietly by design. You would have a validator that never validates and no sign of it.
+>
+> **`docs/nexus-implementation-report.md` is referenced by `CLAUDE.md`** ("run the validation plan in ..."). Without it that pointer dangles in every new project.
 
 ---
 
@@ -36,6 +42,8 @@ From the Nexus template repository, copy into your project root:
 .claude/
 .nexus/
 knowledge/
+tools/
+docs/nexus-implementation-report.md
 CLAUDE.md
 ```
 
@@ -46,8 +54,23 @@ your-project/
 ├── .claude/
 ├── .nexus/
 ├── knowledge/
+├── tools/
+├── docs/
+│   └── nexus-implementation-report.md
 ├── CLAUDE.md
 ```
+
+---
+
+## Step 1b — Clear the template's own session archives
+
+`knowledge/sessions/` in the template contains transcripts of sessions run **in the template repository itself**, written automatically by `nexus-session-writer.py`. They are not your project's history and must not travel with the install:
+
+```bash
+rm -f knowledge/sessions/session--*.md knowledge/sessions/summary--*.md
+```
+
+👉 Skip this only if the template's `knowledge/sessions/` is already empty.
 
 ---
 
@@ -57,7 +80,9 @@ Check that:
 
 - `.claude/hooks/` exists
 - `.claude/settings.json` exists
+- `tools/validate-vault.py` exists
 - `knowledge/` is NOT empty
+- `knowledge/sessions/` contains no leftover template transcripts
 - `CLAUDE.md` exists
 
 👉 If anything is missing — installation is incomplete
@@ -67,18 +92,40 @@ Check that:
 ## Step 3 — Make hooks executable (Mac/Linux)
 
 ```
-chmod +x .claude/hooks/*.py
+chmod +x .claude/hooks/*.py tools/*.py
 ```
 
 ---
 
-## Step 4 — Add runtime file to `.gitignore`
+## Step 4 — Add runtime files to `.gitignore`
 
 Add:
 
 ```
-.nexus/state.json
+.nexus/state*.json
+.nexus/backups/
 ```
+
+👉 A glob, not the literal `.nexus/state.json`: macOS and iCloud create duplicates such as `.nexus/state 2.json`, which the literal rule does not catch and which then get committed.
+
+If the project uses Obsidian on the vault, also add:
+
+```
+knowledge/.obsidian/workspace*.json
+```
+
+That file is per-user pane layout, rewritten on every use. The rest of `knowledge/.obsidian/` is shared configuration and should stay tracked.
+
+---
+
+## Step 4b — Confirm the vault validates
+
+```bash
+python3 tools/validate-vault.py --selftest   # expect: 24/24 passed
+python3 tools/validate-vault.py              # expect: 0 error(s), exit 0
+```
+
+👉 If `--selftest` fails, the copy is incomplete or corrupted. Do not proceed.
 
 ---
 
