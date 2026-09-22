@@ -436,8 +436,12 @@ def core_freeze_reason(tool: str, tool_input: dict[str, Any]) -> str | None:
         return None
     return (
         f"NEXUS CORE FILE: {rel} is owned by Nexus {version or '(version unknown)'}. "
-        "Hosts do not edit the core. Record the change as a feedback note "
-        f"({FEEDBACK_DIR}/) so it reaches Nexus upstream and comes back with the next update; "
-        f"if it cannot wait, unlock the path by listing it in {UNLOCK_FILE} (operator decision) "
-        "and expect `python3 tools/nexus-update.py status` to report it as customized from then on."
+        "Hosts do not edit the core. Record the change as a feedback note instead: "
+        f"write {FEEDBACK_DIR}/feedback--nexus--<slug>.md with type: feedback, scope: nexus, "
+        f"kind: bug|wish|praise, nexus_version: {version or 'unknown'}, host: <this project>, "
+        f"touches: [{rel}], and the sections '## What happened', '## What is proposed', "
+        "'## Attachment' (a diff or 'none'); then run `python3 tools/nexus-update.py feedback push`. "
+        "It reaches Nexus upstream and comes back with the next update. "
+        f"If it cannot wait, the operator may unlock the path by listing it in {UNLOCK_FILE}; "
+        "`python3 tools/nexus-update.py status` then reports it as customized and updates leave it alone."
     )

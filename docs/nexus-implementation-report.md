@@ -192,6 +192,7 @@ These cannot be scripted; they require a real Claude Code session. Perform them 
 | B18 | Pipe `{"hook_event_name":"SessionStart"}` into `nexus-update-check.py` with `CLAUDE_PROJECT_DIR=<host>`: (a) no `installed.json`; (b) baseline at `v1.0.0` with the real remote; (c) a fresh `.nexus/update-check.json` and a bogus URL; (d) a stale record and a bogus URL; (e) an upstream clone without tags; (f) a corrupt `installed.json` | No output and exit 0 in every case; the record shows `ok 1.0.0` after (b), is untouched after (c), `unreachable` after (d), `no-tags` after (e) |
 | B19 | Same, with the baseline's `upstream.url` pointing at a bare clone that carries a `v9.9.9` tag; then again immediately | One line of `additionalContext` naming `9.9.9` and the installed version, both times; the second run makes no network call (record `checked_at` unchanged) |
 | B20 | Time B18(b) and B19's second run | Well under the 15 s hook timeout: the network run is bounded by the 5 s `ls-remote` timeout, the throttled run is file I/O only |
+| B22 | **Live, in a host copy with a baseline:** start a fresh session and ask the agent to change a Nexus hook (for example, "make the exit gate accept a lowercase closure block") | The `Edit` is denied with `NEXUS CORE FILE`; the turn ends with a new `knowledge/feedback/feedback--nexus--*.md` that validates clean and, if asked, a `feedback push`; the hook file is unchanged (`nexus-update.py status` shows it `unchanged`) |
 | B21 | With `NEXUS_UPSTREAM_CACHE` pointing at a scratch directory: in a host copy write a valid `knowledge/feedback/feedback--nexus--*.md`, run `python3 tools/nexus-update.py feedback push`, then pipe `{"hook_event_name":"SessionStart"}` into `nexus-update-check.py` with `CLAUDE_PROJECT_DIR=<template>` | `push` reports one delivery and appends `inbox:<timestamp>` to the note; the hook emits one line `Nexus feedback inbox: 1 note from <host> (1)`; after `feedback archive --all-from <host>` the hook is silent again; with the default cache and an empty mailbox `echo '{}' \| hook \| wc -c` prints `0` (S4) |
 
 ### The transcript race (track B4, B9 and B12 carefully)
@@ -261,7 +262,7 @@ Do not claim the hooks work until all of these are true:
 
 - [ ] Section 2 static checks S1–S6 and S8 pass
 - [ ] Section 3 fixtures report `FAILURES: 0`, including S7
-- [ ] Section 4 rows B1–B21 observed (B9 assessed against the race note, B4 against the narration note; B15–B21 are scriptable by piping JSON)
+- [ ] Section 4 rows B1–B22 observed (B9 assessed against the race note, B4 against the narration note; B15–B21 are scriptable by piping JSON, B22 needs a live session)
 - [ ] Any hook text that quotes a contract is mirrored in the corresponding spec under `knowledge/specs/`
 - [ ] `knowledge/architecture/architecture--system--overall-structure.md` still describes the actual set of registered hooks, with `updated:` bumped
 - [ ] `.nexus/state.json` is gitignored and no stray `.nexus/state*.json` is staged

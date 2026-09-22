@@ -386,6 +386,60 @@ Then, in Claude Code, run `/hooks`.
 
 ---
 
+## Part 6c — Sending feedback upstream
+
+Nexus is still being built, and your project is where its rough edges show first. Because core files are frozen in projects (Part 6a), improvements do not go into your copy; they go **upstream** as feedback notes and come back with the next release.
+
+**Write the note.** Ask Claude for it, or write it yourself, at `knowledge/feedback/feedback--nexus--<slug>.md`:
+
+```yaml
+---
+type: feedback
+scope: nexus
+status: draft
+created: 2026-09-22
+updated: 2026-09-22
+source_of_truth: false
+knowledge_visibility: development
+kind: bug            # bug | wish | praise
+nexus_version: 1.0.0 # from .nexus/installed.json
+host: my-project     # your repository's directory name, kebab-case
+touches: [.claude/hooks/nexus-exit-gate.py]
+delivered: []
+tags: [feedback, nexus]
+---
+
+# One-line title
+
+## What happened
+
+## What is proposed
+
+## Attachment
+
+none
+```
+
+`python3 tools/validate-vault.py knowledge/feedback` checks the shape. Commit the note with your project: it is yours whether or not it is ever delivered.
+
+**Deliver it.** From the project root:
+
+```bash
+python3 tools/nexus-update.py feedback status   # what is pending and why
+python3 tools/nexus-update.py feedback push     # copy into ~/.cache/nexus/inbox/<host>/
+git add knowledge/feedback && git commit -m "feedback: <slug>"
+```
+
+`push` appends a receipt to the note's `delivered:` line and touches nothing else. Edit the note later and push again: the new version is delivered as a second copy. No network, no GitHub credentials: the mailbox is a directory on this machine, and the next Claude Code session started inside the Nexus repository is told how many notes are waiting.
+
+**When the fix arrives** in an update, set the note's `status` to `approved`; if the proposal was declined, `deprecated`. Nothing does this for you.
+
+👉 Praise counts. "This must not break" is as useful upstream as "this is broken".
+
+👉 A project whose `tools/validate-vault.py` predates the release that introduced `type: feedback` will reject the note with `FM006`. Update the project first (Part 6a), then write notes.
+
+---
+
 ## Part 6b — Patch bundles
 
 This part is the way to apply a **patch bundle** to an existing Nexus-based project.
