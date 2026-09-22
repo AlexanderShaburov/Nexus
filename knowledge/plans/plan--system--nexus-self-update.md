@@ -119,14 +119,14 @@ Neither file is delivered to hosts. A host records what it has in `.nexus/instal
 `manifest generate` walks the template working tree and applies, in order:
 
 1. `.claude/hooks/*.py`, `tools/*.py`, `.claude/skills/**` → `replace`, mode `755` for `*.py` and `*.sh`.
-2. `knowledge/**/*.md` outside `sessions/` and `business/` whose frontmatter `scope` is `system` → `replace`, except `knowledge/index/index--system--project-navigation.md` → `index-entries`.
+2. `knowledge/**/*.md` outside `sessions/` and `business/` whose frontmatter `scope` is `system` **and** whose visibility class (explicit `knowledge_visibility`, else the fallback mapping of `spec--system--knowledge-visibility.md`) is not `historical` → `replace`, except `knowledge/index/index--system--project-navigation.md` → `index-entries`. Historical system documents are template history and are not delivered (operator decision, §12 Q8).
 3. `knowledge/.obsidian/*.json` except `workspace*.json` → `create-if-absent`.
 4. Fixed entries: `CLAUDE.md` (`sections`, headings read from the template's own `CLAUDE.md`: every H2 except "What this repository is"), `.claude/settings.json` (`hooks-merge`), `.gitignore` (`ensure-lines`), `.nexus/README.md` (`create-if-absent`), `docs/nexus-implementation-report.md` (`replace`).
 5. Template-only paths are excluded by rule: `patches/**`, `legacy-kb/**`, `dist/**`, `docs/NEXUS_INSTALLATION_GUIDE.md`, `docs/nexus-self-update-brief.md`, `nexus_approach.md`, `README.md`, `nexus.version`, `nexus.manifest.json`.
 
 `manifest verify` (run by `--selftest` and by the Phase 1 acceptance test) regenerates in memory and fails on any difference, so the committed manifest cannot drift from the tree. It also asserts: every hook registered in `.claude/settings.json` has a `replace` entry; no entry path matches a `never_touch` pattern; every `sections` heading exists exactly once in the template's `CLAUDE.md`.
 
-Open point for the operator (§12 Q8): rule 2 currently owns historical `scope: system` documents too (`adr--system--rename-soki-to-nexus.md`, `decision--system--advisory-bootstrap-legacy.md`, `prompt--system--hooks-genesis.md`). Owning them is harmless under three-way (a project that edited one is left alone), but delivering history to hosts may be unwanted.
+Consequence of rule 2 for the template today: `adr--system--rename-soki-to-nexus.md`, `decision--system--advisory-bootstrap-legacy.md` and `prompt--system--hooks-genesis.md` stay out of the manifest. A host that already has them from an earlier copy keeps them untouched (they are simply not owned). The installation guide's "copy `knowledge/`" step will be replaced by the installer (§10a), which copies only manifest entries.
 
 ---
 
@@ -293,6 +293,10 @@ Phase boundaries are pause points per `spec--system--knowledge-driven-task-orche
 | 4 | notifier | `.claude/hooks/nexus-update-check.py`, registration in `.claude/settings.json`, entry in the architecture doc §2d and the implementation report | piping JSON into the hook: silent without baseline, silent when cached, silent when `git` fails (simulated with a bogus URL), one line when newer; runtime under 6 s with the network cut |
 | 5 | retrofit | rehearsal on a template copy, then Liquid_Nexus, then others; runbook `runbook--system--nexus-update-retrofit.md` | each host has a committed `installed.json` and a clean `plan` |
 
+### 10a. Design requirement: the same engine installs
+
+Operator direction (2026-09-22): the goal is the mechanism, and the current install procedure (copy six roots by hand, then run `/project-ingest`) should later become one script run inside the target folder. That is not this plan's scope, but the design must be ready for it, and it already is: with no baseline and no local files every manifest unit classifies as `add` (§7.1), so **install is `apply` on an empty project**. A later `nexus-update.py install [--ref R]` subcommand is the same engine plus the post-install steps of the guide (`chmod`, `.gitignore` lines, baseline write, `validate-vault.py --selftest`), and nothing in Phases 1–5 may assume a host was populated by hand-copying. Vault ingestion (`/project-ingest`) stays a separate, agent-driven step.
+
 Vault writeback per phase: architecture §2d + §3 (new runtime files), a new `spec--system--nexus-update.md` (behavioural contract: strategies, decision table, exit codes, notifier guarantees) in Phase 2, a `decision--system--nexus-self-update.md` recording the alternatives in §11 when the plan is approved, and index entries for all of them.
 
 ---
@@ -310,17 +314,18 @@ Vault writeback per phase: architecture §2d + §3 (new runtime files), a new `s
 
 ## 12. Open questions for the operator
 
-Brief §9, plus what the repository added:
+Brief §9, plus what the repository added. Decisions recorded on 2026-09-22 are marked **decided**; the rest stay open.
 
-1. **Remote and credentials.** `origin` is the private GitHub repository and is reachable from this environment without a prompt. Is the same true from the machines where Liquid_Nexus and the other hosts live?
-2. **Track tags or `main`?** Proposed: tags (`v*`), with `--ref main` available for testing. This needs `v1.0.0` created in Phase 1, after `28ab085` is pushed. Agree?
-3. **Conflicts.** Proposed default: report only. `--conflict-copies` writes `<path>.nexus-upstream` next to the file on request. Agree?
-4. **`patches/`.** Proposed: keep the bundle format for migrations that need operator prompts; the updater does not read or replace bundles. Retire `build-patch-zip.sh` only if no bundle is planned. Agree?
-5. **Which hosts** besides Liquid_Nexus have Nexus installed?
-6. **JSON manifest** instead of YAML (D4). Agree?
-7. **Section ownership of `CLAUDE.md` by H2 heading** (§3.3). The listed headings are the six in the template today. Agree, and should "What this repository is" stay project-owned as proposed?
-8. **Historical system documents** (`adr--…`, `decision--system--advisory-bootstrap-legacy.md`, `prompt--system--hooks-genesis.md`): deliver and update them like any other system document, or exclude them from the manifest?
-9. **Live-session guard** (§7.2, last item): refuse `apply` when `state.json` changed in the last 60 s unless `--in-session`. Too strict, or right?
+1. **Remote and credentials.** `origin` is the private GitHub repository and is reachable from this environment without a prompt. Open: is the same true from the machines where Liquid_Nexus and the other hosts live?
+2. **Track tags or `main`?** **Decided: tags (`v*`)**, `--ref main` for testing; `v1.0.0` is created in Phase 1 after `28ab085` is pushed.
+3. **Conflicts** (the `conflict` row of §7.1: the host edited an owned unit *and* upstream changed the same unit, so neither side can be taken automatically). Proposed default: report only, the host's version stays, exit 1. `--conflict-copies` additionally writes the upstream version next to the file as `<path>.nexus-upstream` for hand merging. Neither option overwrites the host's file. Open: explained to the operator, awaiting confirmation.
+4. **`patches/`.** Proposed: keep the bundle format for migrations that need operator prompts; the updater does not read or replace bundles. Open.
+5. **Which hosts** besides Liquid_Nexus. **Decided: two or three more exist; none is in scope until the mechanism works.** Phase 5 targets Liquid_Nexus only; the others follow the same runbook later.
+6. **JSON manifest** instead of YAML (D4). Open: explained to the operator (stdlib `json` versus no YAML parser), awaiting confirmation.
+7. **Section ownership of `CLAUDE.md` by H2 heading** (§3.3). Open: explained to the operator (Nexus owns the six listed sections; every other section is the host's and is never read), awaiting confirmation.
+8. **Historical system documents.** **Decided: excluded from the manifest.** Documents that do not take part in running the system are template history and are not carried to hosts (§3.4 rule 2).
+9. **Live-session guard** (§7.2, last item): refuse `apply` when `state.json` changed in the last 60 s unless `--in-session`. Open.
+10. **Installer.** **Decided as a design requirement, not as scope:** a one-command install run inside the target folder is wanted later; the engine must serve it (§10a).
 
 ---
 
