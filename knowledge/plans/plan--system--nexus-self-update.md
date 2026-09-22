@@ -26,7 +26,7 @@ tags: [plan, self-update, upgrade, manifest, baseline, three-way-merge, hooks]
 
 # Plan: Nexus self-update
 
-Plan status: **in_progress** (approved by the operator on 2026-09-22 with the decisions in §12; Phases 1 and 2 implemented the same day, see §10. Phases 3–5 not started. The `v1.0.0` tag exists locally; pushing `main` and the tag is pending on the operator's machine.)
+Plan status: **in_progress** (approved by the operator on 2026-09-22 with the decisions in §12; Phases 1 and 2 implemented the same day, see §10. Phases 3–5 not started. `v1.0.0` is tagged on `ac83f1c` and pushed; it is the first release the updater can target.)
 
 The frontmatter `status` is `draft` because the closed enum in `spec--system--document-frontmatter.md` has no `proposed` value; the plan-level status lives in this line, as in `plan--system--context-decision-claim.md`.
 
