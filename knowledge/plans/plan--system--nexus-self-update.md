@@ -1,7 +1,7 @@
 ---
 type: plan
 scope: system
-status: draft
+status: in-progress
 created: 2026-09-22
 updated: 2026-09-22
 source_of_truth: false
@@ -26,7 +26,7 @@ tags: [plan, self-update, upgrade, manifest, baseline, three-way-merge, hooks]
 
 # Plan: Nexus self-update
 
-Plan status: **proposed** (Phase 0 deliverable of `docs/nexus-self-update-brief.md`; awaiting operator review. Nothing in this document is implemented.)
+Plan status: **in_progress** (approved by the operator on 2026-09-22 with the decisions in §12; Phase 1 implemented the same day: `nexus.version`, `nexus.manifest.json`, `tools/nexus-update.py` with `manifest`, `baseline`, `status` and `--selftest`. Phases 2–5 not started.)
 
 The frontmatter `status` is `draft` because the closed enum in `spec--system--document-frontmatter.md` has no `proposed` value; the plan-level status lives in this line, as in `plan--system--context-decision-claim.md`.
 
@@ -121,7 +121,7 @@ Neither file is delivered to hosts. A host records what it has in `.nexus/instal
 `manifest generate` walks the template working tree and applies, in order:
 
 1. `.claude/hooks/*.py`, `tools/*.py`, `.claude/skills/**` → `replace`, mode `755` for `*.py` and `*.sh`.
-2. `knowledge/**/*.md` outside `sessions/` and `business/` whose frontmatter `scope` is `system` **and** whose visibility class (explicit `knowledge_visibility`, else the fallback mapping of `spec--system--knowledge-visibility.md`) is not `historical` → `replace`, except `knowledge/index/index--system--project-navigation.md` → `index-entries`. Historical system documents are template history and are not delivered (operator decision, §12 Q8).
+2. `knowledge/**/*.md` outside `sessions/`, `business/` and `feedback/` whose frontmatter `scope` is `system` **and** whose visibility class (explicit `knowledge_visibility`, else the fallback mapping of `spec--system--knowledge-visibility.md`) is `binding` → `replace`, except `knowledge/index/index--system--project-navigation.md` → `index-entries`. Historical system documents are template history and are not delivered (operator decision, §12 Q8); development documents (the template's own plans) are not delivered either, because a host reviews its own design tracks, not the template's. One binding document is excluded by name in the generator, `decisions/adr--system--rename-soki-to-nexus.md`: it is a rename record kept for its inbound references, binding by frontmatter but history by content. Demoting it to `historical` would make the exclusion redundant; that is a KB judgement left to the operator.
 3. `knowledge/.obsidian/*.json` except `workspace*.json` → `create-if-absent`.
 4. Fixed entries: `CLAUDE.md` (`sections`, headings read from the template's own `CLAUDE.md`: every H2 except "What this repository is"), `.claude/settings.json` (`hooks-merge`), `.gitignore` (`ensure-lines`), `.nexus/README.md` (`create-if-absent`), `docs/nexus-implementation-report.md` (`replace`).
 5. Template-only paths are excluded by rule: `patches/**`, `legacy-kb/**`, `dist/**`, `docs/NEXUS_INSTALLATION_GUIDE.md`, `docs/nexus-self-update-brief.md`, `nexus_approach.md`, `README.md`, `nexus.version`, `nexus.manifest.json`.
@@ -308,7 +308,7 @@ Phase boundaries are pause points per `spec--system--knowledge-driven-task-orche
 | Phase | Deliverable | Files | Acceptance |
 |---|---|---|---|
 | 0 | this proposal | `knowledge/plans/plan--system--nexus-self-update.md` | operator review; answers to §12 |
-| 1 | version + manifest + baseline | `nexus.version` (`1.0.0`), `nexus.manifest.json`, `tools/nexus-update.py` with `manifest`, `baseline`, `status` and `--selftest`; tag `v1.0.0` on `main` after pushing `28ab085`; installation guide Step 4c; `.gitignore` line | `manifest verify` clean; `baseline` on a copy of the template yields 100 % identical units; selftest fixtures for §3.4 rules |
+| 1 | version + manifest + baseline | `nexus.version` (`1.0.0`), `nexus.manifest.json`, `tools/nexus-update.py` with `manifest`, `baseline`, `status` and `--selftest`; tag `v1.0.0` on `main` after pushing `28ab085`; installation guide Step 4c; `.gitignore` line | **Done 2026-09-22.** `manifest verify` clean (36 entries: 27 replace, 5 create-if-absent, 1 each of sections, index-entries, hooks-merge, ensure-lines); `baseline` on a copy of the template: 51 units, all identical; selftest T1–T6 pass; report check S8 added. `baseline --guess` deferred to Phase 2 with the cache clone, since both need ref iteration. |
 | 2 | `check` and `plan` | cache clone, ref selection, three-way engine, all strategies in read mode | every row of §7.1 has a fixture; `plan` on a copy of the template against `v1.0.0` is all `unchanged`; against a synthetic newer ref shows the expected classes |
 | 3 | `apply` + core freeze | backups, temp+rename writes, group order, post-apply validation, `--restore`, report-only conflicts; the core-freeze rule in `nexus-tool-gate.py`, `.nexus/unlock.txt`, spec and architecture mirror (§7.2a) | idempotency: a second `apply --apply` is a no-op with exit 0; a customized unit survives an upstream change; the S1–S5 checks pass after apply; piping JSON into the gate: Edit on a core path denied, on an unlocked path allowed, on a project path allowed, with no `installed.json` allowed |
 | 4 | notifier | `.claude/hooks/nexus-update-check.py`, registration in `.claude/settings.json`, entry in the architecture doc §2d and the implementation report | piping JSON into the hook: silent without baseline, silent when cached, silent when `git` fails (simulated with a bogus URL), one line when newer; runtime under 6 s with the network cut |

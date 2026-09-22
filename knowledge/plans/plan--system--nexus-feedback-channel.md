@@ -160,8 +160,12 @@ Vault writeback: the note format becomes `spec--system--feedback-channel.md` whe
 
 ---
 
-## 7. Open questions for the operator
+## 7. Decisions (operator, 2026-09-22)
 
-1. Should the inbox notice in the template be shown at every session start, or throttled like the update check (once a day)? Proposed: every start, it is local and cheap, and unread feedback should nag.
-2. Should the host's note change `status` automatically when the fix arrives (the updater could match `touches` against the units it just updated), or stay manual? Proposed: manual, to avoid false "fixed" marks; the updater may *suggest* it in `apply` output.
-3. Should `praise` notes be delivered too, or stay in the host as documentation? Proposed: delivered; knowing what must not break is as useful upstream as knowing what is broken.
+The three questions raised with this proposal were answered as proposed:
+
+1. The inbox notice in the template is shown at **every** session start, not throttled: it is local and cheap, and unread feedback should nag.
+2. A note's `status` in the host stays **manual**; the updater may *suggest* "this note's `touches` were just updated" in `apply` output but never marks a note fixed.
+3. `praise` notes **are delivered**: knowing what must not break is as useful upstream as knowing what is broken.
+
+Plan status is unchanged (proposed); implementation starts after Phase 4 of the self-update plan.

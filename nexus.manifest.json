@@ -1,0 +1,223 @@
+{
+  "manifest_version": 1,
+  "nexus_version": "1.0.0",
+  "generated_from": "66aebd9fa8d6362facf332f8c844afbdf1b66988",
+  "generated_at": "2026-09-22T13:48:51",
+  "entries": [
+    {
+      "path": ".claude/hooks/_nexus_common.py",
+      "strategy": "replace",
+      "group": "hooks",
+      "mode": "755"
+    },
+    {
+      "path": ".claude/hooks/nexus-bootstrap.py",
+      "strategy": "replace",
+      "group": "hooks",
+      "mode": "755"
+    },
+    {
+      "path": ".claude/hooks/nexus-exit-gate.py",
+      "strategy": "replace",
+      "group": "hooks",
+      "mode": "755"
+    },
+    {
+      "path": ".claude/hooks/nexus-prompt-gate.py",
+      "strategy": "replace",
+      "group": "hooks",
+      "mode": "755"
+    },
+    {
+      "path": ".claude/hooks/nexus-session-writer.py",
+      "strategy": "replace",
+      "group": "hooks",
+      "mode": "755"
+    },
+    {
+      "path": ".claude/hooks/nexus-tool-gate.py",
+      "strategy": "replace",
+      "group": "hooks",
+      "mode": "755"
+    },
+    {
+      "path": ".claude/hooks/nexus-vault-validator.py",
+      "strategy": "replace",
+      "group": "hooks",
+      "mode": "755"
+    },
+    {
+      "path": ".claude/settings.json",
+      "strategy": "hooks-merge",
+      "group": "hooks"
+    },
+    {
+      "path": ".claude/skills/project-ingest/SKILL.md",
+      "strategy": "replace",
+      "group": "tools"
+    },
+    {
+      "path": ".gitignore",
+      "strategy": "ensure-lines",
+      "group": "repo",
+      "lines": [
+        ".nexus/state*.json",
+        ".nexus/backups/",
+        ".nexus/update-check.json"
+      ]
+    },
+    {
+      "path": ".nexus/README.md",
+      "strategy": "create-if-absent",
+      "group": "runtime"
+    },
+    {
+      "path": "CLAUDE.md",
+      "strategy": "sections",
+      "group": "instructions",
+      "sections": [
+        "## How work proceeds here",
+        "## Mandatory Startup Reading Set",
+        "## Read Priority (when consulting the vault)",
+        "## Knowledge Visibility (review / gap-analysis)",
+        "## Writing rules (if you modify the vault)",
+        "## When editing hooks"
+      ]
+    },
+    {
+      "path": "docs/nexus-implementation-report.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/.obsidian/app.json",
+      "strategy": "create-if-absent",
+      "group": "vault-config"
+    },
+    {
+      "path": "knowledge/.obsidian/appearance.json",
+      "strategy": "create-if-absent",
+      "group": "vault-config"
+    },
+    {
+      "path": "knowledge/.obsidian/core-plugins.json",
+      "strategy": "create-if-absent",
+      "group": "vault-config"
+    },
+    {
+      "path": "knowledge/.obsidian/graph.json",
+      "strategy": "create-if-absent",
+      "group": "vault-config"
+    },
+    {
+      "path": "knowledge/architecture/architecture--system--overall-structure.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/decisions/decision--system--development-visibility-failure.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/glossary/glossary--system--terminology.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/index/index--system--project-navigation.md",
+      "strategy": "index-entries",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/invariants/invariant--system--lifecycle-gates.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/invariants/invariant--system--review-classification.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/runbooks/runbook--system--development-visibility-migration.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/specs/spec--system--architecture-review.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/specs/spec--system--context-decision-gate.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/specs/spec--system--document-frontmatter.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/specs/spec--system--exit-gate.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/specs/spec--system--knowledge-driven-task-orchestration.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/specs/spec--system--knowledge-graph-relations.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/specs/spec--system--knowledge-vault.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/specs/spec--system--knowledge-visibility.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/specs/spec--system--session-bootstrap.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "tools/nexus-decide.py",
+      "strategy": "replace",
+      "group": "tools",
+      "mode": "755"
+    },
+    {
+      "path": "tools/nexus-update.py",
+      "strategy": "replace",
+      "group": "tools",
+      "mode": "755"
+    },
+    {
+      "path": "tools/validate-vault.py",
+      "strategy": "replace",
+      "group": "tools",
+      "mode": "755"
+    }
+  ],
+  "never_touch": [
+    ".nexus/state*.json",
+    ".nexus/session-theme.txt",
+    ".nexus/session-file.txt",
+    ".nexus/installed.json",
+    ".nexus/update-check.json",
+    ".nexus/unlock.txt",
+    ".claude/settings.local.json",
+    "knowledge/sessions/**",
+    "knowledge/business/**",
+    "knowledge/feedback/**"
+  ]
+}

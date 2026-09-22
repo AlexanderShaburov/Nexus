@@ -61,9 +61,15 @@ python3 tools/validate-vault.py --selftest
 
 # S6 — the vault itself is clean
 python3 tools/validate-vault.py
+
+# S8 — the ownership manifest matches the tree, and the updater's rules still hold
+python3 tools/nexus-update.py manifest verify
+python3 tools/nexus-update.py --selftest
 ```
 
-Expected: S1 all `OK`; S2 no output; S3 `MISSING: none` and six registrations (`SessionStart`, `PreCompact`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`×2); S4 prints `0`; S5 all fixtures pass; S6 `0 error(s)` and exit 0.
+Expected: S1 all `OK`; S2 no output; S3 `MISSING: none` and six registrations (`SessionStart`, `PreCompact`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`×2); S4 prints `0`; S5 all fixtures pass; S6 `0 error(s)` and exit 0; S8 `in sync with the tree` and `all checks passed`.
+
+S8 fails whenever a hook, a `tools/*.py` file, a binding system document or an H2 heading of `CLAUDE.md` is added, removed or renamed without regenerating the manifest: run `python3 tools/nexus-update.py manifest generate` and commit `nexus.manifest.json` with the change. Bump `nexus.version` on release, then regenerate.
 
 When a rule changes in `tools/validate-vault.py`, add the case that motivated the change to its `CASES` (must fire) or `CLEAN` (must not) list before declaring the fix good.
 
@@ -244,7 +250,7 @@ Distinct from the race: in some Claude Code builds (2.1.278 with Fable 5.1, 2026
 
 Do not claim the hooks work until all of these are true:
 
-- [ ] Section 2 static checks S1–S6 pass
+- [ ] Section 2 static checks S1–S6 and S8 pass
 - [ ] Section 3 fixtures report `FAILURES: 0`, including S7
 - [ ] Section 4 rows B1–B14 observed (B9 assessed against the race note, B4 against the narration note)
 - [ ] Any hook text that quotes a contract is mirrored in the corresponding spec under `knowledge/specs/`

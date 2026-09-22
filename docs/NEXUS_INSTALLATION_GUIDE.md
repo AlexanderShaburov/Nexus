@@ -82,6 +82,7 @@ Check that:
 - `.claude/settings.json` exists
 - `tools/validate-vault.py` exists
 - `tools/nexus-decide.py` exists
+- `tools/nexus-update.py` exists
 - `knowledge/` is NOT empty
 - `knowledge/sessions/` contains no leftover template transcripts
 - `CLAUDE.md` exists
@@ -127,6 +128,24 @@ python3 tools/validate-vault.py              # expect: 0 error(s), exit 0
 ```
 
 👉 If `--selftest` fails, the copy is incomplete or corrupted. Do not proceed.
+
+---
+
+## Step 4c — Record the install baseline
+
+Nexus can only tell "delivered by Nexus" from "written by this project" if it knows what it delivered. Record that once, right after copying, pointing at the template checkout you copied from:
+
+```bash
+python3 tools/nexus-update.py baseline --upstream /path/to/Nexus --ref v1.0.0
+python3 tools/nexus-update.py status          # expect: every unit unchanged
+git add .nexus/installed.json
+```
+
+👉 `--ref` is the template tag (or commit) you copied. Omit it to baseline against the template's working tree as it is now.
+
+👉 `.nexus/installed.json` is **committed** with your project. It is the baseline for every future update and for the core freeze; unlike `state.json` it is not session state.
+
+👉 Do not edit files listed in `installed.json` by hand. Nexus core files are frozen in projects; improvements go upstream (see the feedback channel when it ships) and come back with the next update. If a change cannot wait, list the path in `.nexus/unlock.txt` and expect `status` to report it as customized from then on.
 
 ---
 

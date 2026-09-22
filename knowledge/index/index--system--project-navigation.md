@@ -80,6 +80,7 @@ Hooks live outside the vault under `.claude/hooks/` and operate against runtime 
 
 - `tools/validate-vault.py` — the vault rule set and its CLI. Holds the machine-checkable form of the frontmatter, naming and visibility contracts; `nexus-vault-validator.py` is a thin adapter over it. Run `python3 tools/validate-vault.py` before declaring a vault edit finished, `--selftest` after changing a rule.
 - `tools/nexus-decide.py` — the Context Decision claim: the tool-carried form of the per-turn decision (context-decision-gate spec, Form A). Validates and prints; decides nothing. Design origin: [Plan: Context Decision claim](../plans/plan--system--context-decision-claim.md) (development class).
+- `tools/nexus-update.py` — the updater: `manifest generate|verify` keeps `nexus.manifest.json` (the list of Nexus-owned paths) in sync with the tree; `baseline` records `.nexus/installed.json` in a host; `status` compares a host with its baseline; `--selftest` proves the rules. Architecture §2d. Design origin: [Plan: Nexus self-update](../plans/plan--system--nexus-self-update.md) (development class).
 
 ## Plans (development class)
 
