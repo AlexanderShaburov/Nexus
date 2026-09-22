@@ -405,6 +405,14 @@ git add -A && git commit -m "chore(nexus): update to <version>"
 
 `up` is `apply` plus auto-detection (install / retrofit / update) and the clean-tree guard; `apply` remains for scripts that want exactly the update step. A project that has Nexus but no `.nexus/installed.json` yet needs no separate `baseline` step: `up` guesses the installed release and records it before updating.
 
+👉 **Retrofitting a project that edited Nexus files** (the dry-run lists them as `conflict` or `customized`): post-apply validation runs the project's **own** `tools/validate-vault.py`. If that file is among the conflicts, restore it in the same run, otherwise the old validator rejects the new documents and the run ends with exit 5:
+
+```bash
+python3 tools/nexus-update.py up --apply --restore tools/validate-vault.py
+```
+
+Then review every remaining conflict with `plan --diff <path>`. Lines the diff removes (`-`) are what your copy has and Nexus does not; if they are only older Nexus wording, `up --apply --restore <path>` brings the file back to Nexus. If they are your own additions, keep the file and send them upstream as a feedback note (Part 6c).
+
 Then, in Claude Code, run `/hooks`.
 
 `apply` writes only the `update` and `add` rows, backs up every file it touches, rewrites `.nexus/installed.json`, and validates the result (vault clean, hooks compile, `settings.json` sane). `customized` and `conflict` rows are left alone; take a single one deliberately with `apply --apply --restore <path>`. A second run after success changes nothing.
