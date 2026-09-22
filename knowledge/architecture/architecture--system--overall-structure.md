@@ -91,7 +91,11 @@ The template carries a version and a machine-generated list of what it owns, so 
 
 ### 2e. Update notifier (`.claude/hooks/nexus-update-check.py`)
 
-A **non-enforcing** hook on `SessionStart` only, registered after `nexus-bootstrap.py`. In a host with a baseline it asks upstream, at most once per 24 h and with one `git ls-remote --tags` call bounded to 5 s, whether a newer `v*` tag exists, records the answer in `.nexus/update-check.json`, and emits one line of context only when the answer is yes. It never fetches objects, never touches the cache clone, never blocks, and stays silent on every failure and in the template. Contract: `specs/spec--system--nexus-update.md` §7. Applying an update stays an explicit operator command (§2d).
+A **non-enforcing** hook on `SessionStart` only, registered after `nexus-bootstrap.py`. In a host with a baseline it asks upstream, at most once per 24 h and with one `git ls-remote --tags` call bounded to 5 s, whether a newer `v*` tag exists, records the answer in `.nexus/update-check.json`, and emits one line of context only when the answer is yes. It never fetches objects, never touches the cache clone, never blocks, and stays silent on every failure. In the template (manifest present, no baseline) it instead counts the feedback notes waiting in the mailbox of the updater cache and reports them in one line at every start (§2f). Contract: `specs/spec--system--nexus-update.md` §7, `specs/spec--system--feedback-channel.md` §4. Applying an update stays an explicit operator command (§2d).
+
+### 2f. Feedback channel (`knowledge/feedback/`, `tools/nexus-update.py feedback`, the mailbox)
+
+Hosts do not edit the Nexus core (§2 tool gate), so observations about Nexus travel the other way as `type: feedback` notes in the host's `knowledge/feedback/`, validated by `tools/validate-vault.py`. `feedback push` copies undelivered or changed notes into `${NEXUS_UPSTREAM_CACHE:-~/.cache/nexus}/inbox/<host>/` with a sidecar and appends a receipt to the note; `feedback list|show|archive` triage the mailbox in the template. No network, no credentials, no registry of hosts: both sides use a fixed local directory. Contract: `specs/spec--system--feedback-channel.md`.
 
 ### 3. Runtime State (`.nexus/`)
 
@@ -118,7 +122,7 @@ SessionStart / PreCompact
   │     ├─ reset .nexus/state.json (bootstrap = pending)
   │     └─ inject mandatory reading set into first turn context
   └─> nexus-update-check.py   (SessionStart only; non-enforcing, silent)
-        ├─ no .nexus/installed.json → exit
+        ├─ no .nexus/installed.json → template? report the feedback inbox count; else exit
         ├─ .nexus/update-check.json younger than 24 h → reuse
         ├─ else one `git ls-remote --tags`, 5 s budget → record ok / no-tags / unreachable
         └─ newer v* tag than installed → one line of context; otherwise nothing

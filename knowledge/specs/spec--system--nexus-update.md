@@ -135,7 +135,7 @@ Every unit with strategy `replace` in `installed.json` is Nexus core. `nexus-too
 
 `.claude/hooks/nexus-update-check.py` is a **non-enforcing** hook registered on `SessionStart` only (not `PreCompact`), after `nexus-bootstrap.py`. Its whole contract:
 
-1. No `.nexus/installed.json`, or one without a version or upstream URL → exit 0, no output. The freeze and the notifier both switch on with the baseline, so the template never sees either.
+1. No `.nexus/installed.json`, or one without a version or upstream URL → exit 0, no output about updates. The freeze and the update notice both switch on with the baseline, so the template never sees either. In the template itself (no baseline, `nexus.manifest.json` present) the hook instead reports the feedback mailbox, per `spec--system--feedback-channel.md` §4.
 2. `.nexus/update-check.json` younger than 24 h → reused; no network.
 3. Otherwise exactly one network call, `git ls-remote --tags <upstream url>`, with a 5 s timeout and `GIT_TERMINAL_PROMPT=0`: no fetch, no clone, no credential prompt. The highest `v*` tag gives the version; the record is written with `status` `ok`, `no-tags` or `unreachable` and `via: hook`. A failure therefore keeps the next 24 h quiet.
 4. Output only when the recorded upstream version is **newer** than the installed one, and then exactly one line of `additionalContext`: `Nexus <new> is available upstream (<tag>); this project has <old>. Run python3 tools/nexus-update.py plan to see what would change. Nothing has been applied.`

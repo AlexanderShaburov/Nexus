@@ -11,7 +11,9 @@ knowledge/specs/spec--system--nexus-update.md. Subcommands:
     check                 (host)     is a newer Nexus available upstream? (network: fetch)
     plan                  (host)     the full three-way table: baseline / local / upstream
     apply                 (host)     adopt the target version; dry-run unless --apply
-    --selftest                       prove the rules, the extractors, the table and apply
+    feedback status|push  (host)     feedback notes about Nexus → the local mailbox in the cache
+    feedback list|show|archive (template) triage the mailbox
+    --selftest                       prove the rules, the extractors, the table, apply and feedback
 
 Without --apply nothing in a host is written except .nexus/update-check.json
 (`check`) and .nexus/installed.json (`baseline`). Stdlib only.
@@ -1270,6 +1272,279 @@ def compute_apply(project: WorkTree, installed: dict, upstream: WorkTree | GitRe
 
 
 # --------------------------------------------------------------------------
+# Feedback channel — notes in a host, mailbox in the cache (spec--system--feedback-channel.md §4)
+# --------------------------------------------------------------------------
+
+FEEDBACK_DIR = "knowledge/feedback"
+FEEDBACK_GLOB = "feedback--nexus--*.md"
+INBOX_DIR = "inbox"
+INBOX_ARCHIVE_DIR = "inbox-archive"
+FM_RE = re.compile(r"^---\n(.*?)\n---\n", re.S)
+_VOLATILE_FM_KEYS = ("delivered", "updated")
+
+
+def note_fingerprint(text: str) -> str:
+    """SHA-256 of a note with the delivery-owned frontmatter lines removed, so a
+    push does not change what the next push compares against."""
+    m = FM_RE.match(text)
+    if not m:
+        return sha256_bytes(text.encode("utf-8", errors="surrogateescape"))
+    kept: list[str] = []
+    skipping = False
+    for line in m.group(1).split("\n"):
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*:", line):
+            key = line.split(":", 1)[0]
+            skipping = key in _VOLATILE_FM_KEYS
+            if skipping:
+                continue
+        elif skipping and re.match(r"^\s*-\s+", line):
+            continue
+        else:
+            skipping = False
+        kept.append(line)
+    body = text[m.end():]
+    return sha256_bytes(("\n".join(kept) + "\n" + body).encode("utf-8", errors="surrogateescape"))
+
+
+def set_frontmatter_fields(text: str, fields: dict[str, object]) -> str:
+    """Rewrite scalar / list fields inside the frontmatter block, leaving everything else byte-identical."""
+    m = FM_RE.match(text)
+    if not m:
+        raise UpdaterError("note has no frontmatter block", 1)
+    lines = m.group(1).split("\n")
+    out: list[str] = []
+    done: set[str] = set()
+    skipping = False
+
+    def render(key: str, value: object) -> str:
+        if isinstance(value, list):
+            return f"{key}: [{', '.join(str(v) for v in value)}]"
+        return f"{key}: {value}"
+
+    for line in lines:
+        km = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):", line)
+        if km:
+            key = km.group(1)
+            if key in fields:
+                out.append(render(key, fields[key]))
+                done.add(key)
+                skipping = True
+                continue
+            skipping = False
+            out.append(line)
+            continue
+        if skipping and re.match(r"^\s*-\s+", line):
+            continue
+        skipping = False
+        out.append(line)
+    for key, value in fields.items():
+        if key in done:
+            continue
+        idx = next((i for i, ln in enumerate(out) if ln.startswith("tags:")), len(out))
+        out.insert(idx, render(key, value))
+    return "---\n" + "\n".join(out) + "\n---\n" + text[m.end():]
+
+
+def load_notes(root: pathlib.Path) -> list[dict]:
+    validator = load_validator(root)
+    notes: list[dict] = []
+    for p in sorted((root / FEEDBACK_DIR).glob(FEEDBACK_GLOB)):
+        text = p.read_text(encoding="utf-8", errors="surrogateescape")
+        fm = frontmatter_of(validator, text)
+        title = next((ln[2:].strip() for ln in text.split("\n") if ln.startswith("# ")), p.stem)
+        delivered = fm.get("delivered") or []
+        if not isinstance(delivered, list):
+            delivered = [str(delivered)]
+        notes.append({
+            "path": p, "rel": p.relative_to(root).as_posix(), "text": text, "fm": fm, "title": title,
+            "host": str(fm.get("host") or root.name).strip(), "kind": str(fm.get("kind") or "?"),
+            "version": str(fm.get("nexus_version") or "unknown"), "status": str(fm.get("status") or "?"),
+            "delivered": delivered, "fingerprint": note_fingerprint(text),
+        })
+    return notes
+
+
+def inbox_root() -> pathlib.Path:
+    return cache_root() / INBOX_DIR
+
+
+def archive_root() -> pathlib.Path:
+    return cache_root() / INBOX_ARCHIVE_DIR
+
+
+def _sidecars(host: str) -> list[dict]:
+    found: list[dict] = []
+    for base in (inbox_root(), archive_root()):
+        d = base / host
+        if not d.is_dir():
+            continue
+        for sc in d.glob("*.json"):
+            try:
+                data = json.loads(sc.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            data["_sidecar"] = sc
+            found.append(data)
+    return found
+
+
+def note_is_pending(note: dict) -> tuple[bool, str]:
+    """(pending, reason). A note is pending until a sidecar with its fingerprint exists."""
+    receipts = [r for r in note["delivered"] if str(r).startswith("inbox:")]
+    matches = [s for s in _sidecars(note["host"]) if s.get("path") == note["rel"]]
+    if not receipts and not matches:
+        return True, "never delivered"
+    if not matches:
+        return True, "receipt present but the mailbox has no copy (cache wiped?)"
+    latest = max(matches, key=lambda s: s.get("pushed_at", ""))
+    if latest.get("fingerprint") != note["fingerprint"]:
+        return True, "changed since last delivery"
+    return False, f"delivered {latest.get('pushed_at')}"
+
+
+def push_note(root: pathlib.Path, note: dict, dry_run: bool) -> pathlib.Path:
+    ts = datetime.datetime.now().replace(microsecond=0)
+    stamp = ts.strftime("%Y-%m-%dT%H-%M-%S")
+    dest_dir = inbox_root() / note["host"]
+    dest = dest_dir / f"{stamp}--{note['path'].name}"
+    if dry_run:
+        return dest
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    receipt = f"inbox:{ts.isoformat()}"
+    new_text = set_frontmatter_fields(note["text"], {
+        "delivered": list(note["delivered"]) + [receipt],
+        "updated": ts.strftime("%Y-%m-%d"),
+    })
+    commit = None
+    try:
+        commit = git(root, "rev-parse", "HEAD").strip()
+    except UpdaterError:
+        pass
+    sidecar = {
+        "host": note["host"], "path": note["rel"], "commit": commit, "pushed_at": ts.isoformat(),
+        "fingerprint": note["fingerprint"], "sha256": sha256_bytes(new_text.encode("utf-8", errors="surrogateescape")),
+        "kind": note["kind"], "nexus_version": note["version"], "title": note["title"], "receipt": receipt,
+    }
+    dest.write_text(new_text, encoding="utf-8", errors="surrogateescape")
+    dest.with_suffix(".json").write_text(json.dumps(sidecar, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp = note["path"].with_name(note["path"].name + ".nexus-tmp")
+    tmp.write_text(new_text, encoding="utf-8", errors="surrogateescape")
+    os.replace(tmp, note["path"])
+    return dest
+
+
+def inbox_entries(include_archive: bool = False) -> list[dict]:
+    entries: list[dict] = []
+    bases = [inbox_root()] + ([archive_root()] if include_archive else [])
+    for base in bases:
+        if not base.is_dir():
+            continue
+        for host_dir in sorted(p for p in base.iterdir() if p.is_dir()):
+            for md in sorted(host_dir.glob("*.md")):
+                sc = md.with_suffix(".json")
+                data: dict = {}
+                if sc.is_file():
+                    try:
+                        data = json.loads(sc.read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError):
+                        data = {}
+                entries.append({"file": md, "sidecar": sc if sc.is_file() else None, "host": host_dir.name,
+                                "archived": base == archive_root(), **{k: data.get(k) for k in
+                                ("kind", "nexus_version", "title", "pushed_at", "path", "commit")}})
+    entries.sort(key=lambda e: (e["archived"], e.get("pushed_at") or "", e["file"].name))
+    return entries
+
+
+def inbox_summary() -> tuple[int, dict[str, int]]:
+    per_host: dict[str, int] = {}
+    for e in inbox_entries():
+        per_host[e["host"]] = per_host.get(e["host"], 0) + 1
+    return sum(per_host.values()), per_host
+
+
+def _pick_entry(selector: str, entries: list[dict]) -> dict:
+    if selector.isdigit():
+        n = int(selector)
+        if 1 <= n <= len(entries):
+            return entries[n - 1]
+        raise UpdaterError(f"no inbox entry #{n} (1..{len(entries)})", 1)
+    for e in entries:
+        if e["file"].name == selector or e["file"].name.endswith(f"--{selector}") or e["file"].name.endswith(f"--{selector}.md"):
+            return e
+    raise UpdaterError(f"no inbox entry matches {selector!r}", 1)
+
+
+def cmd_feedback(args) -> int:
+    action = args.feedback_action
+    if action in ("status", "push"):
+        root = pathlib.Path(args.project_root).resolve()
+        if not (root / FEEDBACK_DIR).is_dir():
+            print(f"{FEEDBACK_DIR}/ does not exist here; nothing to {action}.")
+            return 0
+        notes = load_notes(root)
+        if not notes:
+            print(f"no {FEEDBACK_GLOB} notes under {FEEDBACK_DIR}/")
+            return 0
+        pending = [(n, *note_is_pending(n)) for n in notes]
+        if action == "status":
+            print(f"=== feedback notes in {root.name} ({len(notes)}) — mailbox: {inbox_root()} ===")
+            for n, is_pending, why in pending:
+                flag = "PENDING " if is_pending else "delivered"
+                print(f"  {flag}  {n['kind']:6} {n['status']:11} {n['rel']}  ({why})")
+            return 0
+        todo = [(n, why) for n, is_pending, why in pending if is_pending]
+        if not todo:
+            print(f"all {len(notes)} note(s) already delivered to {inbox_root()}")
+            return 0
+        for n, why in todo:
+            dest = push_note(root, n, args.dry_run)
+            verb = "WOULD DELIVER" if args.dry_run else "delivered"
+            print(f"  [{verb}] {n['rel']}  →  {dest}  ({why})")
+        if args.dry_run:
+            print(f"\nDRY-RUN: {len(todo)} note(s) would be delivered; nothing written.")
+        else:
+            print(f"\n{len(todo)} note(s) delivered. Receipts appended to each note's `delivered:`; commit the notes.")
+        return 0
+
+    entries = inbox_entries(include_archive=getattr(args, "all", False))
+    if action == "list":
+        if not entries:
+            print(f"inbox empty: {inbox_root()}")
+            return 0
+        print(f"=== Nexus feedback inbox: {inbox_root()} ===")
+        for i, e in enumerate(entries, 1):
+            mark = " (archived)" if e["archived"] else ""
+            print(f"  {i:3}. {e['host']:14} {str(e.get('kind') or '?'):6} {str(e.get('nexus_version') or '?'):7} "
+                  f"{str(e.get('pushed_at') or '')[:19]:19}  {e.get('title') or e['file'].name}{mark}")
+        return 0
+    if action == "show":
+        e = _pick_entry(args.selector, entries)
+        print(f"# {e['file']}\n")
+        print(e["file"].read_text(encoding="utf-8", errors="surrogateescape"))
+        return 0
+    if action == "archive":
+        live = [e for e in entries if not e["archived"]]
+        if args.all_from:
+            chosen = [e for e in live if e["host"] == args.all_from]
+            if not chosen:
+                print(f"no live inbox entries from {args.all_from!r}")
+                return 0
+        else:
+            if not args.selector:
+                raise UpdaterError("archive needs an entry number / name or --all-from <host>", 1)
+            chosen = [_pick_entry(args.selector, live)]
+        for e in chosen:
+            dest_dir = archive_root() / e["host"]
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            for src in (e["file"], e["sidecar"]):
+                if src is not None:
+                    shutil.move(str(src), str(dest_dir / src.name))
+            print(f"  archived  {e['host']}/{e['file'].name}")
+        return 0
+    raise UpdaterError(f"unknown feedback action {action!r}", 4)
+
+
+# --------------------------------------------------------------------------
 # Commands
 # --------------------------------------------------------------------------
 
@@ -2015,6 +2290,75 @@ def selftest(real_root: pathlib.Path) -> int:
         check(exit_hook["timeout"] == 30, "T9 hooks-merge takes the upstream entry")
         check(any("nexus-bootstrap.py" in c for c in cmds), "T9 hooks-merge adds a new nexus hook")
         check(units_hooks_merge(json.dumps(merged).encode()) == units_hooks_merge(json.dumps(s2).encode()), "T9 merged units equal upstream units")
+
+        # T10 — feedback notes: push to the mailbox, receipts, re-push on change, list / show / archive, inbox notice.
+        note_text = (
+            "---\ntype: feedback\nscope: nexus\nstatus: draft\ncreated: 2026-01-03\nupdated: 2026-01-03\n"
+            "source_of_truth: false\nknowledge_visibility: development\nkind: bug\nnexus_version: 1.0.0\n"
+            "host: fixture-host\ntouches: [.claude/hooks/nexus-exit-gate.py]\ndelivered: []\ntags: [feedback, nexus]\n---\n\n"
+            "# Exit gate too strict\n\n## What happened\n\nDenied.\n\n## What is proposed\n\nRelax.\n\n## Attachment\n\nnone\n"
+        )
+        _w(host, f"{FEEDBACK_DIR}/feedback--nexus--exit-gate-too-strict.md", note_text)
+        _w(host, f"{FEEDBACK_DIR}/feedback--nexus--thanks.md",
+           note_text.replace("kind: bug", "kind: praise").replace("delivered: []", "delivered:\n  - issue:#7")
+                    .replace("# Exit gate too strict", "# Thanks"))
+        check(note_fingerprint(note_text) == note_fingerprint(note_text.replace("delivered: []", "delivered: [inbox:x]")
+                                                              .replace("updated: 2026-01-03", "updated: 2026-02-02")),
+              "T10 fingerprint ignores delivered/updated")
+        rewritten = set_frontmatter_fields(note_text.replace("delivered: []", "delivered:\n  - issue:#7"),
+                                           {"delivered": ["issue:#7", "inbox:t"], "updated": "2026-02-02"})
+        check("delivered: [issue:#7, inbox:t]" in rewritten and "updated: 2026-02-02" in rewritten
+              and "  - issue:#7" not in rewritten and rewritten.endswith("none\n"), f"T10 frontmatter rewrite:\n{rewritten}")
+        rc = quiet_main(["--project-root", str(host), "feedback", "status"])
+        check(rc == 0 and last_output[0].count("PENDING") == 2, f"T10 status shows both pending:\n{last_output[0]}")
+        rc = quiet_main(["--project-root", str(host), "feedback", "push", "--dry-run"])
+        check(rc == 0 and not inbox_root().exists() and "delivered: []" in (host / FEEDBACK_DIR / "feedback--nexus--exit-gate-too-strict.md").read_text(),
+              "T10 push --dry-run writes nothing")
+        rc = quiet_main(["--project-root", str(host), "feedback", "push"])
+        delivered = sorted((inbox_root() / "fixture-host").glob("*.md"))
+        check(rc == 0 and len(delivered) == 2 and all(p.with_suffix(".json").is_file() for p in delivered), f"T10 push delivered two notes:\n{last_output[0]}")
+        n1 = (host / FEEDBACK_DIR / "feedback--nexus--exit-gate-too-strict.md").read_text()
+        check("delivered: [inbox:" in n1 and "updated: 2026-01-03" not in n1, "T10 receipt appended and updated bumped")
+        n2 = (host / FEEDBACK_DIR / "feedback--nexus--thanks.md").read_text()
+        check("delivered: [issue:#7, inbox:" in n2, "T10 existing receipts kept")
+        rc = quiet_main(["--project-root", str(host), "feedback", "push"])
+        check(rc == 0 and "already delivered" in last_output[0] and len(list((inbox_root() / "fixture-host").glob("*.md"))) == 2,
+              "T10 second push is a no-op")
+        p1 = host / FEEDBACK_DIR / "feedback--nexus--exit-gate-too-strict.md"
+        p1.write_text(p1.read_text().replace("Relax.", "Relax the regex."))
+        import time as _time
+        _time.sleep(1.1)  # distinct timestamp prefix
+        rc = quiet_main(["--project-root", str(host), "feedback", "push"])
+        check(rc == 0 and len(list((inbox_root() / "fixture-host").glob("*.md"))) == 3, "T10 edited note delivered again")
+        check(p1.read_text().count("inbox:") == 2, "T10 second receipt appended")
+        rc = quiet_main(["--project-root", str(host), "feedback", "push"])
+        check("already delivered" in last_output[0], "T10 no-op after re-delivery")
+        total, per_host = inbox_summary()
+        check(total == 3 and per_host == {"fixture-host": 3}, f"T10 inbox summary {total} {per_host}")
+        rc = quiet_main(["feedback", "list"])
+        check(rc == 0 and last_output[0].count("fixture-host") == 3 and "Thanks" in last_output[0], f"T10 list:\n{last_output[0]}")
+        rc = quiet_main(["feedback", "show", "1"])
+        check(rc == 0 and "## What happened" in last_output[0], "T10 show prints the note")
+        rc = quiet_main(["feedback", "archive", "1"])
+        check(rc == 0 and inbox_summary()[0] == 2 and len(list((archive_root() / "fixture-host").glob("*"))) == 2, "T10 archive moves note + sidecar")
+        rc = quiet_main(["feedback", "archive", "--all-from", "fixture-host"])
+        check(rc == 0 and inbox_summary()[0] == 0, "T10 archive --all-from empties the inbox")
+        rc = quiet_main(["--project-root", str(host), "feedback", "push"])
+        check("already delivered" in last_output[0], "T10 archived copies still count as delivered")
+        rc = quiet_main(["feedback", "list", "--all"])
+        check("(archived)" in last_output[0], "T10 list --all shows archived")
+        # inbox notice from the real hook, run against the fixture template (manifest present, no baseline)
+        _w(host, f"{FEEDBACK_DIR}/feedback--nexus--another.md", note_text.replace("too-strict", "another").replace("# Exit gate too strict", "# Another"))
+        quiet_main(["--project-root", str(host), "feedback", "push"])
+        hook = real_root / ".claude" / "hooks" / "nexus-update-check.py"
+        if hook.is_file():
+            r = subprocess.run([sys.executable, str(hook)], input='{"hook_event_name":"SessionStart"}', capture_output=True,
+                               text=True, env={**os.environ, "CLAUDE_PROJECT_DIR": str(template)}, timeout=30)
+            check(r.returncode == 0 and "feedback inbox: 1 note" in r.stdout and "fixture-host (1)" in r.stdout,
+                  f"T10 inbox notice in the template: {r.stdout[:200]!r} {r.stderr[:200]!r}")
+            r = subprocess.run([sys.executable, str(hook)], input='{"hook_event_name":"SessionStart"}', capture_output=True,
+                               text=True, env={**os.environ, "CLAUDE_PROJECT_DIR": str(host)}, timeout=30)
+            check(r.returncode == 0 and "feedback inbox" not in r.stdout, "T10 no inbox notice in a host")
     except UpdaterError as e:
         failures.append(f"unexpected UpdaterError during selftest: {e}")
     finally:
@@ -2088,6 +2432,19 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--allow-downgrade", action="store_true")
     a.add_argument("--in-session", action="store_true",
                    help="proceed although a Claude Code session looks live (then run /hooks)")
+
+    f = sub.add_parser("feedback", help="feedback notes: host side push/status, template side list/show/archive")
+    fs = f.add_subparsers(dest="feedback_action")
+    fs.add_parser("status", help="host: list notes and their delivery state")
+    fp = fs.add_parser("push", help="host: copy undelivered / changed notes into the local mailbox")
+    fp.add_argument("--dry-run", action="store_true")
+    fl = fs.add_parser("list", help="template: list the mailbox")
+    fl.add_argument("--all", action="store_true", help="include archived entries")
+    fsh = fs.add_parser("show", help="template: print one entry")
+    fsh.add_argument("selector", help="entry number from `list`, or file name / slug")
+    fa = fs.add_parser("archive", help="template: move an entry to inbox-archive/")
+    fa.add_argument("selector", nargs="?", help="entry number from `list`, or file name / slug")
+    fa.add_argument("--all-from", metavar="HOST", help="archive every live entry from this host")
     return ap
 
 
@@ -2109,6 +2466,10 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_plan(args)
         if args.command == "apply":
             return cmd_apply(args)
+        if args.command == "feedback":
+            if not args.feedback_action:
+                ap.parse_args(["feedback", "--help"])
+            return cmd_feedback(args)
         ap.print_help()
         return 0
     except UpdaterError as e:

@@ -45,6 +45,7 @@ These specs define how the vault itself and the agent lifecycle are enforced. Th
 - [Knowledge Visibility](../specs/spec--system--knowledge-visibility.md) — the three review-visibility classes (binding / development / historical) and the `knowledge_visibility` field
 - [Architecture Review](../specs/spec--system--architecture-review.md) — mandatory dual-analysis workflow (Binding State + Development State) and four-way gap classification
 - [Nexus Update](../specs/spec--system--nexus-update.md) — version identity, ownership manifest, install baseline, upstream cache, three-way table, `apply`, the core freeze in hosts, exit codes
+- [Feedback Channel](../specs/spec--system--feedback-channel.md) — the `type: feedback` note a host writes about Nexus, the local mailbox transport (`feedback push` / `list` / `show` / `archive`) and the inbox notice in the template; GitHub-issue transport deferred
 
 ---
 
@@ -76,17 +77,13 @@ Hooks live outside the vault under `.claude/hooks/` and operate against runtime 
 
 - `nexus-session-writer.py` — Stop; archives the transcript to `sessions/` (architecture §2a)
 - `nexus-vault-validator.py` — PostToolUse; advisory frontmatter validation of a document just written (architecture §2b)
-- `nexus-update-check.py` — SessionStart; in a host with a baseline, one throttled `ls-remote` and one line of context when a newer Nexus tag exists (architecture §2e, spec [Nexus Update](../specs/spec--system--nexus-update.md) §7)
+- `nexus-update-check.py` — SessionStart; in a host with a baseline, one throttled `ls-remote` and one line of context when a newer Nexus tag exists; in the template, one line with the feedback inbox count (architecture §2e, specs [Nexus Update](../specs/spec--system--nexus-update.md) §7 and [Feedback Channel](../specs/spec--system--feedback-channel.md) §4)
 
 ## Runtime (tools)
 
 - `tools/validate-vault.py` — the vault rule set and its CLI. Holds the machine-checkable form of the frontmatter, naming and visibility contracts; `nexus-vault-validator.py` is a thin adapter over it. Run `python3 tools/validate-vault.py` before declaring a vault edit finished, `--selftest` after changing a rule.
 - `tools/nexus-decide.py` — the Context Decision claim: the tool-carried form of the per-turn decision (context-decision-gate spec, Form A). Validates and prints; decides nothing. Design origin: [Plan: Context Decision claim](../plans/plan--system--context-decision-claim.md) (development class).
-- `tools/nexus-update.py` — the updater: `manifest generate|verify` keeps `nexus.manifest.json` (the list of Nexus-owned paths) in sync with the tree; `baseline` records `.nexus/installed.json` in a host; `status` compares a host with its baseline; `check` asks upstream for a newer version; `plan` prints the three-way table; `apply` adopts a version with backups and validation; `--selftest` proves the rules. Architecture §2d. Contract: [Nexus Update](../specs/spec--system--nexus-update.md). Design origin: [Plan: Nexus self-update](../plans/plan--system--nexus-self-update.md) (development class).
-
-## Specs in review (development class)
-
-- [Feedback Channel](../specs/spec--system--feedback-channel.md) — the `type: feedback` note a host writes about Nexus (format realized and validated) and the mailbox / issue transports (pending); promoted to binding when `feedback push` lands.
+- `tools/nexus-update.py` — the updater: `manifest generate|verify` keeps `nexus.manifest.json` (the list of Nexus-owned paths) in sync with the tree; `baseline` records `.nexus/installed.json` in a host; `status` compares a host with its baseline; `check` asks upstream for a newer version; `plan` prints the three-way table; `apply` adopts a version with backups and validation; `feedback push|status` (host) and `feedback list|show|archive` (template) run the feedback mailbox; `--selftest` proves the rules. Architecture §2d, §2f. Contract: [Nexus Update](../specs/spec--system--nexus-update.md). Design origin: [Plan: Nexus self-update](../plans/plan--system--nexus-self-update.md) (development class).
 
 ## Plans (development class)
 

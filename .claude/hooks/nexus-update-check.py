@@ -2,10 +2,15 @@
 """Nexus: SessionStart hook — is a newer Nexus tagged upstream? (non-enforcing)
 
 Contract: spec--system--nexus-update.md §7. This hook gates nothing, blocks
-nothing, and is silent on every path but one: when the highest v* tag
-upstream is newer than the version recorded in .nexus/installed.json, it emits
-a single line of additionalContext naming both versions and the command that
-shows what would change. Nothing is ever applied here.
+nothing, and is silent on every path but two:
+- in a host with a baseline, when the highest v* tag upstream is newer than the
+  version recorded in .nexus/installed.json, it emits a single line of
+  additionalContext naming both versions and the command that shows what
+  would change. Nothing is ever applied here;
+- in the template (nexus.manifest.json present, no baseline), when feedback
+  notes are waiting in the local mailbox of the updater cache, it emits one
+  line with the count per host (spec--system--feedback-channel.md §4). Not
+  throttled: unread feedback should nag.
 
 Guarantees:
 - no baseline (.nexus/installed.json absent) → exit 0, no output: the project
@@ -39,6 +44,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _nexus_common import emit_context, project_dir, read_hook_input  # noqa: E402
 
 INSTALLED_FILE = ".nexus/installed.json"
+MANIFEST_FILE = "nexus.manifest.json"
 UPDATE_CHECK_FILE = ".nexus/update-check.json"
 THROTTLE_SECONDS = 24 * 60 * 60
 LS_REMOTE_TIMEOUT = 5
@@ -107,6 +113,39 @@ def _ls_remote_highest_tag(url: str) -> tuple[str | None, str | None, str | None
     return best[1][1:], best[1], best[2]
 
 
+def _cache_root() -> pathlib.Path:
+    """Same resolution as tools/nexus-update.py: NEXUS_UPSTREAM_CACHE, else $XDG_CACHE_HOME/nexus, else ~/.cache/nexus."""
+    env = os.environ.get("NEXUS_UPSTREAM_CACHE")
+    if env:
+        return pathlib.Path(env).expanduser()
+    xdg = os.environ.get("XDG_CACHE_HOME")
+    base = pathlib.Path(xdg).expanduser() if xdg else pathlib.Path.home() / ".cache"
+    return base / "nexus"
+
+
+def _inbox_notice(event: str) -> None:
+    """Template side (spec--system--feedback-channel.md §4): count notes waiting in the local mailbox.
+
+    Shown at every session start, not throttled (operator decision: unread feedback should nag).
+    """
+    inbox = _cache_root() / "inbox"
+    if not inbox.is_dir():
+        return
+    per_host: dict[str, int] = {}
+    for host_dir in sorted(p for p in inbox.iterdir() if p.is_dir()):
+        n = len(list(host_dir.glob("*.md")))
+        if n:
+            per_host[host_dir.name] = n
+    total = sum(per_host.values())
+    if not total:
+        return
+    hosts = ", ".join(f"{h} ({n})" for h, n in per_host.items())
+    emit_context(event, (
+        f"Nexus feedback inbox: {total} note{'s' if total != 1 else ''} from {hosts}. "
+        "Run `python3 tools/nexus-update.py feedback list` to read them."
+    ))
+
+
 def main() -> int:
     inp = read_hook_input()
     event = inp.get("hook_event_name") or "SessionStart"
@@ -114,6 +153,10 @@ def main() -> int:
 
     installed = _load_json(root / INSTALLED_FILE)
     if not installed:
+        # No baseline: either the template itself (it has the manifest) or an
+        # un-baselined host. Only the template reads the mailbox.
+        if (root / MANIFEST_FILE).is_file():
+            _inbox_notice(event)
         return 0
     have = _semver(str(installed.get("nexus_version", "")))
     url = (installed.get("upstream") or {}).get("url")

@@ -1,8 +1,8 @@
 {
   "manifest_version": 1,
   "nexus_version": "1.0.0",
-  "generated_from": "06661313a9977f2241a7e93e2905cba204bfbbbc",
-  "generated_at": "2026-09-22T14:24:38",
+  "generated_from": "73850198083997cd4d74d3438d49453ba7dc0481",
+  "generated_at": "2026-09-22T14:42:58",
   "entries": [
     {
       "path": ".claude/hooks/_nexus_common.py",
@@ -167,6 +167,11 @@
     },
     {
       "path": "knowledge/specs/spec--system--exit-gate.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/specs/spec--system--feedback-channel.md",
       "strategy": "replace",
       "group": "vault"
     },
