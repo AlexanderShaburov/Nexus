@@ -12,7 +12,7 @@ tags: [glossary, terminology, canonical]
 ## Relations
 
 - depends_on:
-  - [ADR — Rename SOKI to Nexus](../decisions/adr--system--rename-soki-to-nexus.md) — registers the canonical system name fixed here.
+  - `decisions/adr--system--rename-soki-to-nexus.md` (template history, not delivered to hosts; cited by path, not linked) — registers the canonical system name fixed here.
 - relates_to:
   - [Knowledge Vault Specification](../specs/spec--system--knowledge-vault.md) — defines `Knowledge Vault` as a canonical term used in this glossary.
 

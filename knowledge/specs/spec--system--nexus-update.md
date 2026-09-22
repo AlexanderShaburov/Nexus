@@ -7,7 +7,7 @@ updated: 2026-09-22
 source_of_truth: true
 knowledge_visibility: binding
 theme: nexus-self-update
-governs: [nexus.version, nexus.manifest.json, tools/nexus-update.py, .claude/hooks/nexus-update-check.py, .nexus/installed.json, .nexus/update-check.json, .nexus/unlock.txt]
+governs: [nexus.version, nexus.manifest.json, nexus.py, tools/nexus-update.py, .claude/hooks/nexus-update-check.py, .nexus/installed.json, .nexus/update-check.json, .nexus/unlock.txt]
 tags: [spec, self-update, manifest, baseline, three-way, cli]
 ---
 
@@ -63,7 +63,7 @@ A **unit** is the thing compared and, later, written. Whole-file strategies have
 |---|---|---|---|
 | `replace` | the file | — | raw bytes |
 | `sections` | one H2 section of `CLAUDE.md` | heading line | heading through the line before the next H2 (code fences do not start sections), normalized |
-| `index-entries` | one bullet line of the navigation index | first Markdown link target, as written | the line, normalized |
+| `index-entries` | one entry line of the navigation index: a bullet whose **leading** element is a Markdown link, i.e. the dash is followed directly by the bracketed title and its target | that link's target, as written | the line, normalized. Bullets that only mention a document later in the line are prose, not units |
 | `hooks-merge` | one hook entry of `.claude/settings.json` | `<event>/<nexus-*.py basename>` | canonical JSON of `{matcher, hook}` |
 | `ensure-lines` | one line of `.gitignore` | the line | presence only |
 | `create-if-absent` | the file | — | presence only |
@@ -160,6 +160,17 @@ Blocking rows are left alone and the run exits 1; everything else is applied. Wh
 
 ---
 
+## 8a. `install`, `up` and the bootstrap (*realized*)
+
+The same engine serves installation and retrofit, so a host is never populated by hand-copying:
+
+- **`install`**: `apply` against an **empty baseline**. Every manifest unit is `add` (or `adopt` when identical content already exists, `unbaselined` when different content does). Two strategies behave specially when the local file is absent: `sections` writes a project stub (`# CLAUDE.md`, an explanatory sentence, an empty `## What this repository is`) followed by the owned sections, never the template's own project text; `index-entries` writes the template's index minus bullet lines that link to documents Nexus does not deliver. `hooks-merge` on an absent file writes the upstream file wholesale. The baseline is written with `origin: install`. Refuses (exit 2) where `.claude/hooks/nexus-bootstrap.py` already exists unless `--force`. Undelivered classes (`plans/`, `sessions/`, `feedback/`, history) never appear in the host.
+- **`up`**: one command for any directory. No Nexus → `install`. Nexus without `installed.json` → **retrofit**: `baseline --guess` over every `v*` tag and recent `main` commits, the baseline written (`--apply` only), then `apply`; units that differ from the guessed release are `customized` and left alone. Baseline present → `apply`. All three are dry-run unless `--apply`.
+- **Clean-tree guard**: with `--apply`, `install` and `up` refuse when `git status --porcelain` (tracked files) is non-empty, so the change lands as one commit; `--allow-dirty` overrides. The live-session guard of §8 applies as well.
+- **What the tooling cannot do** is printed at the end of an install: run `/hooks` inside Claude Code, run `/project-ingest` for an existing project, describe the project in `CLAUDE.md`.
+- **`nexus.py`** at the template root is the one-file bootstrap for a directory that has no updater yet: it ensures `git`, clones or fetches the cache, selects the highest `v*` tag (or `--ref`), extracts `tools/nexus-update.py` from that tag into a temporary file and runs it with `up` and all remaining arguments. It refuses a tag whose updater predates `up`. A local checkout may be given as `--upstream` (its working tree, or `--ref` inside it). Template-only; stdlib only.
+- **Validation of undelivered links**: because `plans/` and `sessions/` are not shipped, `validate-vault.py` reports a dangling link into either as a **warning** (`LK002`), not an error; every other broken link stays `LK001`. Post-install validation therefore passes in a host that received binding documents citing template plans.
+
 ## 9. Exit codes
 
 | Code | Meaning |
@@ -176,4 +187,4 @@ Blocking rows are left alone and the run exits 1; everything else is applied. Wh
 
 ## 10. Selftest
 
-`tools/nexus-update.py --selftest` MUST pass before a release is tagged. It builds a fixture template, proves every generation rule (T1), every extractor including refusal cases (T2), `manifest verify` (T3), `baseline` and `status` (T4), reading from a git ref (T5), every row of §5 against a fixture 1.1.0 release (T7), the cache clone, ref selection, `--guess`, `check` and `plan` through the CLI including the unreachable path (T8), `apply` on that host: dry-run writes nothing, clean rows written, blocking and customized rows untouched, backups taken, baseline recorded per §8, second run a no-op, `--restore` per path, the live-session guard, and the `hooks-merge` writer (T9), and finally that the real template's manifest is in sync (T6). The core freeze is proven by piping PreToolUse JSON into the gate (implementation report, rows B15–B17).
+`tools/nexus-update.py --selftest` MUST pass before a release is tagged. It builds a fixture template, proves every generation rule (T1), every extractor including refusal cases (T2), `manifest verify` (T3), `baseline` and `status` (T4), reading from a git ref (T5), every row of §5 against a fixture 1.1.0 release (T7), the cache clone, ref selection, `--guess`, `check` and `plan` through the CLI including the unreachable path (T8), `apply` on that host: dry-run writes nothing, clean rows written, blocking and customized rows untouched, backups taken, baseline recorded per §8, second run a no-op, `--restore` per path, the live-session guard, and the `hooks-merge` writer (T9), the feedback mailbox end to end (T10), `install` into an empty directory and into a project with its own `CLAUDE.md` / `settings.json` / `.gitignore`, the clean-tree guard, the retrofit of a `v1.0.0` archive with a customization, `up` as a no-op afterwards, and `nexus.py` from the cache and from a local checkout (T11), and finally that the real template's manifest is in sync (T6). The core freeze is proven by piping PreToolUse JSON into the gate (implementation report, rows B15–B17).

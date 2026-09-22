@@ -349,7 +349,15 @@ def validate_document(path: pathlib.Path, root: pathlib.Path, check_links: bool)
             resolved = (path.parent / target).resolve()
             if not resolved.exists():
                 line = text[: lm.start()].count("\n") + 1
-                add(max(line, body_offset), "LK001", "error", f"broken relative link -> {target}")
+                # Links into plans/ and sessions/ point at development / historical
+                # documents, which the Nexus updater does not deliver to hosts; a
+                # dangling one there is expected in a host and only a warning.
+                parts = resolved.parts
+                if "knowledge" in parts and any(d in parts[parts.index("knowledge") + 1:] for d in ("plans", "sessions")):
+                    add(max(line, body_offset), "LK002", "warning",
+                        f"link into an undelivered class -> {target} (plans/ and sessions/ are not shipped to hosts)")
+                else:
+                    add(max(line, body_offset), "LK001", "error", f"broken relative link -> {target}")
 
     return out
 
@@ -441,6 +449,7 @@ CASES: list[tuple[str, str, str, str]] = [
     ("NM002", "plans", "spec--system--x.md", GOOD),
     ("NM003", "specs", "plan--system--x.md", GOOD),
     ("LK001", "specs", "spec--system--x.md", GOOD + "\n[gone](./nowhere.md)\n"),
+    ("LK002", "specs", "spec--system--x.md", GOOD + "\n[plan](../plans/plan--system--gone.md)\n"),
     ("FB001", "feedback", "feedback--nexus--x.md", FEEDBACK_NOTE.replace("host: liquid-nexus\n", "")),
     ("FB002", "feedback", "feedback--nexus--x.md", FEEDBACK_NOTE.replace("kind: bug", "kind: rant")),
     ("FB003", "feedback", "feedback--nexus--x.md", FEEDBACK_NOTE.replace("## Attachment", "## Patch")),

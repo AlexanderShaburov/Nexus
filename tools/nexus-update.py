@@ -11,6 +11,8 @@ knowledge/specs/spec--system--nexus-update.md. Subcommands:
     check                 (host)     is a newer Nexus available upstream? (network: fetch)
     plan                  (host)     the full three-way table: baseline / local / upstream
     apply                 (host)     adopt the target version; dry-run unless --apply
+    install               (any dir)  install Nexus where there is none; dry-run unless --apply
+    up                    (any dir)  install / retrofit / update, auto-detected; dry-run unless --apply
     feedback status|push  (host)     feedback notes about Nexus → the local mailbox in the cache
     feedback list|show|archive (template) triage the mailbox
     --selftest                       prove the rules, the extractors, the table, apply and feedback
@@ -105,13 +107,19 @@ TEMPLATE_HISTORY = {
 TEMPLATE_ONLY_PREFIXES = ("patches/", "legacy-kb/", "dist/", "docs/", "knowledge/sessions/",
                           "knowledge/business/", "knowledge/feedback/")
 TEMPLATE_ONLY_FILES = {
-    "README.md", "nexus_approach.md", VERSION_FILE, MANIFEST_FILE, ".DS_Store",
+    "README.md", "nexus_approach.md", "nexus.py", VERSION_FILE, MANIFEST_FILE, ".DS_Store",
 }
+
+# Where hosts fetch Nexus from when no baseline records a URL yet (install, retrofit).
+DEFAULT_UPSTREAM = "https://github.com/AlexanderShaburov/Nexus.git"
 
 HOOK_CMD_RE = re.compile(r"/\.claude/hooks/(nexus-[A-Za-z0-9_-]+\.py)$")
 SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 LINK_RE = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 BULLET_RE = re.compile(r"^\s*[-*]\s+")
+# An index *entry* is a bullet whose leading element is a link: "- [Title](target) — text".
+# Bullets that merely mention a document later in the line are prose, not units.
+ENTRY_RE = re.compile(r"^\s*[-*]\s+\[[^\]]*\]\(([^)\s]+)\)")
 
 GIT_ENV = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
 GIT_TIMEOUT = 60
@@ -467,9 +475,7 @@ def units_index_entries(content: bytes | None, index_rel: str, owned: set[str]) 
     units: dict[str, bytes] = {}
     seen: dict[str, int] = {}
     for line in text.replace("\r\n", "\n").split("\n"):
-        if not BULLET_RE.match(line):
-            continue
-        m = LINK_RE.search(line)
+        m = ENTRY_RE.match(line)
         if not m:
             continue
         target = m.group(1).split("#", 1)[0]
@@ -1023,9 +1029,7 @@ def apply_index_entries(local: bytes | None, upstream: bytes | None, index_rel: 
     keys = [k for k in keys if k in up_units]
 
     def key_of(line: str) -> str | None:
-        if not BULLET_RE.match(line):
-            return None
-        m = LINK_RE.search(line)
+        m = ENTRY_RE.match(line)
         if not m:
             return None
         target = m.group(1).split("#", 1)[0]
@@ -1216,14 +1220,15 @@ def compute_apply(project: WorkTree, installed: dict, upstream: WorkTree | GitRe
             if s["units"]:
                 data = up
         elif strategy == "sections":
-            heads = [u.partition("#")[2] for u in s["units"]]
-            data = apply_sections(local, up, heads)
+            wanted = {u.partition("#")[2] for u in s["units"]}
+            heads = [h for h in e.get("sections", []) if h in wanted]  # template order, not alphabetical
+            data = install_claude_text(up, e.get("sections", [])) if local is None else apply_sections(local, up, heads)
         elif strategy == "index-entries":
             keys = [u.partition("#")[2] for u in s["units"]]
-            data = apply_index_entries(local, up, path, owned, keys)
+            data = install_index_text(up, path, owned) if local is None else apply_index_entries(local, up, path, owned, keys)
         elif strategy == "hooks-merge":
             keys = [u.partition("#")[2] for u in s["units"]]
-            data = apply_hooks_merge(local, up, keys)
+            data = up if local is None else apply_hooks_merge(local, up, keys)
         elif strategy == "ensure-lines":
             data = apply_ensure_lines(local, e.get("lines", []))
         elif strategy == "create-if-absent":
@@ -1265,10 +1270,63 @@ def compute_apply(project: WorkTree, installed: dict, upstream: WorkTree | GitRe
         "nexus_version": manifest.get("nexus_version") or installed["nexus_version"],
         "installed_at": now_iso(),
         "upstream": upstream.describe(),
-        "origin": "update",
+        "origin": "install" if installed.get("origin") == "empty" else "update",
         "units": dict(sorted(units.items())),
     }
     return ops, new_installed
+
+
+CLAUDE_STUB = (
+    "# CLAUDE.md\n\n"
+    "This file is the project-level memory loaded automatically by Claude Code. The sections below that "
+    "describe the Nexus workflow are owned by Nexus and refreshed by `tools/nexus-update.py`; everything "
+    "else in this file belongs to the project.\n\n"
+    "## What this repository is\n\n"
+    "_Describe this project here. In an existing project, run `/project-ingest` in Claude Code to build the "
+    "Knowledge Vault from what is already written._\n"
+)
+
+
+def install_claude_text(upstream: bytes | None, headings: list[str]) -> bytes:
+    """A host without CLAUDE.md gets a project stub plus the Nexus-owned sections, never the template's own text."""
+    up_units = units_sections(upstream, headings)
+    parts = [CLAUDE_STUB.rstrip("\n")]
+    for h in headings:
+        if h in up_units:
+            parts.append(up_units[h].decode("utf-8", errors="surrogateescape"))
+    return ("\n\n".join(parts) + "\n").encode("utf-8", errors="surrogateescape")
+
+
+def install_index_text(upstream: bytes | None, index_rel: str, owned: set[str]) -> bytes:
+    """A host without a navigation index gets the template's, minus bullet lines that link to
+    documents Nexus does not deliver (the template's own plans and history)."""
+    text = (upstream or b"").decode("utf-8", errors="surrogateescape")
+    base = posixpath.dirname(index_rel)
+    kept: list[str] = []
+    for line in text.replace("\r\n", "\n").split("\n"):
+        m = ENTRY_RE.match(line)
+        if m:
+            target = m.group(1).split("#", 1)[0]
+            if target and "://" not in target:
+                resolved = posixpath.normpath(posixpath.join(base, target))
+                if resolved.startswith("knowledge/") and resolved not in owned:
+                    continue
+        kept.append(line)
+    return "\n".join(kept).encode("utf-8", errors="surrogateescape")
+
+
+def empty_installed(version: str = "0.0.0") -> dict:
+    return {"baseline_version": BASELINE_VERSION, "nexus_version": version, "installed_at": now_iso(),
+            "upstream": {}, "origin": "empty", "units": {}}
+
+
+def git_tree_dirty(project_root: pathlib.Path) -> list[str]:
+    """Uncommitted changes in the host, or [] when clean or not a git repository."""
+    try:
+        out = git(project_root, "status", "--porcelain", "--untracked-files=no")
+    except UpdaterError:
+        return []
+    return [ln for ln in out.splitlines() if ln.strip()]
 
 
 # --------------------------------------------------------------------------
@@ -1557,10 +1615,8 @@ def _guard_project(project_root: pathlib.Path, force: bool = False) -> int | Non
 
 
 def _open_target(args, installed: dict | None) -> tuple[WorkTree | GitRef, dict, str]:
-    """Resolve --upstream / --ref (falling back to the baseline's URL) into (source, manifest, version)."""
-    spec = args.upstream or (installed or {}).get("upstream", {}).get("url")
-    if not spec:
-        raise UpdaterError("no upstream known: pass --upstream <url-or-path> (the baseline records it afterwards)", 3)
+    """Resolve --upstream / --ref (falling back to the baseline's URL, then the default repository)."""
+    spec = args.upstream or (installed or {}).get("upstream", {}).get("url") or DEFAULT_UPSTREAM
     source = open_upstream(spec, args.ref, offline=getattr(args, "offline", False))
     manifest = read_manifest_from(source)
     version = upstream_version(source) or manifest.get("nexus_version")
@@ -1794,22 +1850,31 @@ def cmd_apply(args) -> int:
     if rc:
         return rc
     installed = load_installed(project_root)
-    project = WorkTree(project_root)
     source, manifest, version = _open_target(args, installed)
+    return perform_apply(project_root, installed, source, manifest, version, do_apply=args.apply,
+                         restore=set(args.restore or []), backup_dir=args.backup_dir,
+                         in_session=args.in_session, allow_downgrade=args.allow_downgrade, title="apply")
+
+
+def perform_apply(project_root: pathlib.Path, installed: dict, source: WorkTree | GitRef, manifest: dict,
+                  version: str, *, do_apply: bool, restore: set[str], backup_dir: str | None,
+                  in_session: bool, allow_downgrade: bool, title: str) -> int:
+    """The write half shared by apply, install and up (spec §8)."""
+    project = WorkTree(project_root)
     have = installed["nexus_version"]
+    installing = installed.get("origin") == "empty"
     d = source.describe()
-    if parse_semver(version) < parse_semver(have) and not args.allow_downgrade:
+    if parse_semver(version) < parse_semver(have) and not allow_downgrade:
         print(f"ERROR: upstream {d['ref']} is Nexus {version}, older than the installed {have}; "
               "pass --allow-downgrade to apply it anyway", file=sys.stderr)
         return 1
-    if args.apply and live_session_recent(project_root) and not args.in_session:
+    if do_apply and live_session_recent(project_root) and not in_session:
         print(f"ERROR: {STATE_FILE} changed in the last {LIVE_SESSION_SECONDS}s: a Claude Code session looks live, "
               "and apply rewrites the hooks that govern it. Run apply from a plain terminal, or pass "
               "--in-session and run /hooks immediately afterwards.", file=sys.stderr)
         return 6
 
     rows = three_way(project, installed, source, manifest)
-    restore = set(args.restore or [])
     unknown = [p for p in restore if p not in {e["path"] for e in manifest["entries"]}]
     if unknown:
         print("ERROR: --restore path(s) not in the target manifest: " + ", ".join(unknown), file=sys.stderr)
@@ -1817,13 +1882,14 @@ def cmd_apply(args) -> int:
     ops, new_installed = compute_apply(project, installed, source, manifest, rows, restore)
     blocking = sum(len(rows[c]) for c in BLOCKING_CLASSES)
     hooks_touched = any(o["group"] == "hooks" for o in ops)
-    mode = "APPLY" if args.apply else "DRY-RUN"
+    mode = "APPLY" if do_apply else "DRY-RUN"
 
-    print(f"=== Nexus apply: {have} → {version} ({d['url']} @ {d['ref']})  mode: {mode} ===")
+    head = f"install Nexus {version}" if installing else f"{have} → {version}"
+    print(f"=== Nexus {title}: {head} ({d['url']} @ {d['ref']})  mode: {mode} ===")
     print("  " + "  ".join(f"{c}={len(rows[c])}" for c in PLAN_CLASSES if rows[c]))
     nothing_to_write = not ops and new_installed["units"] == installed["units"] and version == have
     print()
-    verb = {"create": "created", "write": "written", "chmod": "chmod"} if args.apply else \
+    verb = {"create": "created", "write": "written", "chmod": "chmod"} if do_apply else \
            {"create": "WOULD CREATE", "write": "WOULD WRITE", "chmod": "WOULD CHMOD"}
     for o in ops:
         tag = "  [restore]" if o["restore"] else ""
@@ -1839,22 +1905,22 @@ def cmd_apply(args) -> int:
     if nothing_to_write:
         print("\nNothing to write: every unit is either current or deliberately left alone.")
         return 1 if blocking else 0
-    if not args.apply:
+    if not do_apply:
         print(f"\nThis was a DRY-RUN: {len(ops)} file(s) would change. Re-run with --apply to write them.")
         return 1 if blocking else 0
 
     # Backups before the first write.
     ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup_dir = pathlib.Path(args.backup_dir).resolve() if args.backup_dir \
-        else project_root / ".nexus" / "backups" / f"update-{version}-{ts}"
+    bdir = pathlib.Path(backup_dir).resolve() if backup_dir \
+        else project_root / ".nexus" / "backups" / f"{'install' if installing else 'update'}-{version}-{ts}"
     for o in ops:
         if o["exists"]:
-            dst = backup_dir / o["path"]
+            dst = bdir / o["path"]
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(project_root / o["path"], dst)
     if (project_root / INSTALLED_FILE).is_file():
-        (backup_dir / INSTALLED_FILE).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(project_root / INSTALLED_FILE, backup_dir / INSTALLED_FILE)
+        (bdir / INSTALLED_FILE).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(project_root / INSTALLED_FILE, bdir / INSTALLED_FILE)
 
     # Writes, in group order; hooks last.
     for o in ops:
@@ -1865,16 +1931,24 @@ def cmd_apply(args) -> int:
             set_mode(target, o["mode"])
     write_json_atomic(project_root / INSTALLED_FILE, new_installed)
 
-    print(f"\n  backup:    {backup_dir}")
-    print(f"  baseline:  {INSTALLED_FILE} rewritten ({len(new_installed['units'])} units, Nexus {new_installed['nexus_version']})")
+    print(f"\n  backup:    {bdir}" if any(o["exists"] for o in ops) else "\n  backup:    nothing pre-existing to back up")
+    print(f"  baseline:  {INSTALLED_FILE} {'written' if installing else 'rewritten'} "
+          f"({len(new_installed['units'])} units, Nexus {new_installed['nexus_version']})")
     problems = run_post_apply_validation(project_root)
     if problems:
         print("\nPOST-APPLY VALIDATION FAILED:", file=sys.stderr)
         for p in problems:
             print(f"  - {p}", file=sys.stderr)
-        print(f"Files are in place; restore from {backup_dir} or fix forward.", file=sys.stderr)
+        print(f"Files are in place; restore from {bdir} or fix forward.", file=sys.stderr)
         return 5
     print("  validation: vault clean, validator selftest passed, hooks compile, settings.json sane")
+    if installing:
+        print("\nNexus installed. Next, in this directory:")
+        print(f"  1. git add -A && git commit -m 'chore(nexus): install Nexus {version}'")
+        print("  2. open Claude Code here and run:  /hooks")
+        print("  3. existing project? run:  /project-ingest   (builds the Knowledge Vault from what is already written)")
+        print("  4. describe the project in CLAUDE.md under '## What this repository is'")
+        return 1 if blocking else 0
     if hooks_touched:
         print("\nHooks were rewritten. In Claude Code, run:  /hooks")
     if blocking:
@@ -1882,6 +1956,86 @@ def cmd_apply(args) -> int:
         return 1
     print(f"\nUpdate applied. Commit {INSTALLED_FILE} with the changed files.")
     return 0
+
+
+def cmd_install(args) -> int:
+    project_root = pathlib.Path(args.project_root).resolve()
+    if (project_root / ".claude" / "hooks" / "nexus-bootstrap.py").is_file() and not args.force:
+        print("ERROR: Nexus is already present here. Use `up` (auto-detects install / retrofit / update) "
+              "or `baseline` + `apply`; --force installs over it anyway.", file=sys.stderr)
+        return 2
+    if args.apply and not args.allow_dirty:
+        dirty = git_tree_dirty(project_root)
+        if dirty:
+            print(f"ERROR: {len(dirty)} uncommitted change(s) in this repository; commit or stash them so the "
+                  "install is one clean commit, or pass --allow-dirty.", file=sys.stderr)
+            return 1
+    source, manifest, version = _open_target(args, None)
+    return perform_apply(project_root, empty_installed(), source, manifest, version, do_apply=args.apply,
+                         restore=set(), backup_dir=args.backup_dir, in_session=args.in_session,
+                         allow_downgrade=True, title="install")
+
+
+def cmd_up(args) -> int:
+    """One command for any directory: install, retrofit (baseline --guess + apply) or update."""
+    project_root = pathlib.Path(args.project_root).resolve()
+    has_nexus = (project_root / ".claude" / "hooks" / "nexus-bootstrap.py").is_file()
+    has_baseline = (project_root / INSTALLED_FILE).is_file()
+    if args.apply and not args.allow_dirty:
+        dirty = git_tree_dirty(project_root)
+        if dirty:
+            print(f"ERROR: {len(dirty)} uncommitted change(s) in this repository; commit or stash them so the "
+                  "change is one clean commit, or pass --allow-dirty.", file=sys.stderr)
+            return 1
+
+    if not has_nexus:
+        print("Nexus not found here → install.\n")
+        args.force = False
+        args.allow_dirty = True  # checked above
+        return cmd_install(args)
+
+    if has_baseline:
+        print("Nexus with a baseline → update.\n")
+        installed = load_installed(project_root)
+        source, manifest, version = _open_target(args, installed)
+        return perform_apply(project_root, installed, source, manifest, version, do_apply=args.apply,
+                             restore=set(args.restore or []), backup_dir=args.backup_dir,
+                             in_session=args.in_session, allow_downgrade=args.allow_downgrade, title="update")
+
+    # Retrofit: Nexus files exist but nothing records what was delivered.
+    print("Nexus without a baseline → retrofit: guess the installed version, record it, then update.\n")
+    spec = args.upstream or DEFAULT_UPSTREAM
+    project = WorkTree(project_root)
+    if is_local_dir(spec):
+        repo, url = pathlib.Path(spec).expanduser(), None
+    else:
+        repo, url = ensure_cache(spec, offline=args.offline), spec
+    scores = guess_ref(project, repo, url)
+    if not scores:
+        raise UpdaterError("no candidate ref carries a manifest; cannot guess the installed version", 3)
+    print("  identical units per candidate ref:")
+    for identical, neg_custom, ref in scores[:5]:
+        print(f"    {identical:4} identical  {-neg_custom:4} customized   {display_ref(ref)}")
+    chosen = scores[0][2]
+    base_src: WorkTree | GitRef = GitRef(repo, chosen, url=url)
+    base_src.ref = display_ref(chosen)
+    base_manifest = read_manifest_from(base_src)
+    base_version = upstream_version(base_src) or base_manifest.get("nexus_version") or "0.0.0"
+    installed, inv = compute_baseline(project, base_src, base_manifest, base_version)
+    print(f"  baseline: Nexus {base_version} @ {base_src.ref}: {len(inv['identical'])} identical, "
+          f"{len(inv['customized'])} customized, {len(inv['absent'])} absent")
+    for uid in inv["customized"]:
+        print(f"    customized  {uid}")
+    if args.apply:
+        write_json_atomic(project_root / INSTALLED_FILE, installed)
+        print(f"  wrote {INSTALLED_FILE}")
+    else:
+        print(f"  (dry-run: {INSTALLED_FILE} not written)")
+    print()
+    source, manifest, version = _open_target(args, installed)
+    return perform_apply(project_root, installed, source, manifest, version, do_apply=args.apply,
+                         restore=set(args.restore or []), backup_dir=args.backup_dir,
+                         in_session=args.in_session, allow_downgrade=args.allow_downgrade, title="update")
 
 
 # --------------------------------------------------------------------------
@@ -1929,6 +2083,7 @@ tags: [index]
 - [Exit Gate](../specs/spec--system--exit-gate.md) — owned line
 - [Editor](../specs/spec--editor--media.md) — project line
 - `nexus-bootstrap.py` — no link, never a unit
+- `tools/x.py` — prose that mentions [Exit Gate](../specs/spec--system--exit-gate.md) later in the line: not a unit
 """
 
 _SETTINGS = {
@@ -1960,6 +2115,10 @@ def _build_fixture(root: pathlib.Path, real_validator: pathlib.Path) -> None:
     _w(root, ".claude/settings.json", json.dumps(_SETTINGS, indent=2) + "\n")
     _w(root, "tools/nexus-decide.py", "#!/usr/bin/env python3\n", exec_bit=True)
     shutil.copy2(real_validator, root / "tools" / "validate-vault.py")
+    # The real updater travels with the fixture so nexus.py can run it from a fixture tag.
+    real_updater = real_validator.parent / "nexus-update.py"
+    if real_updater.is_file():
+        shutil.copy2(real_updater, root / "tools" / "nexus-update.py")
     for n in SPEC_NAMES:
         _w(root, f"knowledge/specs/spec--system--{n}.md", _FM_BINDING.format(t="spec", n=n))
     _w(root, "knowledge/specs/spec--editor--media.md", _FM_PROJECT)
@@ -2244,7 +2403,8 @@ def selftest(real_root: pathlib.Path) -> int:
         check("## Writing rules\n" in cm_text and "## Writing rules (if you modify the vault)" not in cm_text, "T9 renamed heading left alone")
         idx_text = (host / "knowledge/index/index--system--project-navigation.md").read_text()
         check("spec--system--alpha.md) — new owned line" in idx_text and "project line stays invisible" in idx_text
-              and idx_text.count("spec--system--exit-gate.md") == 1, "T9 index line inserted, project line kept")
+              and idx_text.count("- [Exit Gate]") == 1 and "later in the line: not a unit" in idx_text,
+              "T9 index line inserted, project line and prose bullet kept")
         gi = (host / ".gitignore").read_text()
         check(".nexus/backups/" in gi and ".nexus/update-check.json" in gi and gi.count(".nexus/state*.json") == 1, "T9 ensure-lines appended once")
         check((host / "knowledge/.obsidian/app.json").is_file(), "T9 create-if-absent recreated")
@@ -2359,6 +2519,91 @@ def selftest(real_root: pathlib.Path) -> int:
             r = subprocess.run([sys.executable, str(hook)], input='{"hook_event_name":"SessionStart"}', capture_output=True,
                                text=True, env={**os.environ, "CLAUDE_PROJECT_DIR": str(host)}, timeout=30)
             check(r.returncode == 0 and "feedback inbox" not in r.stdout, "T10 no inbox notice in a host")
+
+        # T11 — install / up / nexus.py.
+        # (a) install into an empty directory.
+        fresh = tmp / "fresh"
+        fresh.mkdir()
+        rc = quiet_main(["--project-root", str(fresh), "install", "--upstream", url])
+        check(rc == 0 and not (fresh / ".claude").exists(), f"T11 install dry-run writes nothing; rc={rc}\n{last_output[0]}")
+        rc = quiet_main(["--project-root", str(fresh), "install", "--upstream", url, "--apply"])
+        check(rc == 0, f"T11 install into empty dir; rc={rc}\n{last_output[0]}")
+        check((fresh / ".claude/hooks/nexus-bootstrap.py").stat().st_mode & stat.S_IXUSR, "T11 installed hook executable")
+        cm = (fresh / "CLAUDE.md").read_text()
+        check("## What this repository is" in cm and "## How work proceeds here" in cm and "Protocol text, revised." in cm
+              and "Project text that Nexus must never read." not in cm, f"T11 CLAUDE.md stub + owned sections:\n{cm}")
+        ix = (fresh / "knowledge/index/index--system--project-navigation.md").read_text()
+        check("spec--system--exit-gate.md" in ix and "spec--editor--media.md" not in ix and ix.startswith("---\n"),
+              f"T11 index delivered without undelivered links:\n{ix}")
+        check((fresh / ".claude/settings.json").read_bytes() == up11.read(".claude/settings.json"), "T11 settings.json copied wholesale")
+        check(".nexus/backups/" in (fresh / ".gitignore").read_text(), "T11 gitignore created")
+        check((fresh / ".nexus/README.md").is_file() and (fresh / "knowledge/.obsidian/app.json").is_file(), "T11 create-if-absent files")
+        check(not (fresh / "knowledge/sessions").exists() and not (fresh / "knowledge/plans").exists(), "T11 undelivered classes absent")
+        inst = load_installed(fresh)
+        check(inst["origin"] == "install" and inst["nexus_version"] == "1.1.0", f"T11 baseline origin install: {inst['origin']} {inst['nexus_version']}")
+        rc = quiet_main(["--project-root", str(fresh), "up", "--upstream", url, "--apply"])
+        check(rc == 0 and "Nothing to write" in last_output[0], f"T11 up after install is a no-op:\n{last_output[0]}")
+        rc = quiet_main(["--project-root", str(fresh), "install", "--upstream", url, "--apply"])
+        check(rc == 2, "T11 install refuses where Nexus exists")
+
+        # (b) install into a project with its own CLAUDE.md, settings.json and .gitignore; dirty-tree guard.
+        proj = tmp / "proj"
+        _w(proj, "CLAUDE.md", "# My project\n\n## Team rules\n\nBe kind.\n")
+        _w(proj, ".claude/settings.json", json.dumps({"hooks": {"Stop": [{"matcher": "", "hooks": [
+            {"type": "command", "command": "$CLAUDE_PROJECT_DIR/scripts/project-hook.sh"}]}]}}, indent=2) + "\n")
+        _w(proj, ".gitignore", "node_modules/\n")
+        _w(proj, "README.md", "# mine\n")
+        git(proj, "init", "-q", "-b", "main")
+        git(proj, "-c", "user.name=t", "-c", "user.email=t@t", "add", "-A")
+        rc = quiet_main(["--project-root", str(proj), "up", "--upstream", url, "--apply"])
+        check(rc == 1 and "uncommitted" in last_output[0] and not (proj / ".claude/hooks").exists(), "T11 dirty tree refused")
+        git(proj, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "before nexus")
+        rc = quiet_main(["--project-root", str(proj), "up", "--upstream", url, "--apply"])
+        check(rc == 0, f"T11 up installs into a project; rc={rc}\n{last_output[0]}")
+        cm = (proj / "CLAUDE.md").read_text()
+        check("## Team rules" in cm and "Be kind." in cm and "## How work proceeds here" in cm
+              and "## What this repository is" not in cm, f"T11 project CLAUDE.md kept, sections appended:\n{cm}")
+        cfg = json.loads((proj / ".claude/settings.json").read_text())
+        cmds = [h["command"] for g in cfg["hooks"]["Stop"] for h in g["hooks"]]
+        check(any("project-hook.sh" in c for c in cmds) and any("nexus-exit-gate.py" in c for c in cmds), f"T11 hooks merged: {cmds}")
+        gi = (proj / ".gitignore").read_text()
+        check(gi.startswith("node_modules/") and ".nexus/state*.json" in gi, "T11 gitignore kept + extended")
+        check((proj / "README.md").read_text() == "# mine\n", "T11 project README untouched")
+
+        # (c) retrofit: an old (v1.0.0) Nexus without a baseline, with one customization.
+        retro = tmp / "retro"
+        retro.mkdir()
+        tar = subprocess.run(["git", "-C", str(template), "archive", "v1.0.0"], capture_output=True, check=True).stdout
+        subprocess.run(["tar", "-x", "-C", str(retro)], input=tar, check=True)
+        for rel in ("README.md", VERSION_FILE, MANIFEST_FILE):
+            (retro / rel).unlink(missing_ok=True)
+        _append(retro / "knowledge/specs/spec--system--exit-gate.md", "\nhost edit\n")
+        rc = quiet_main(["--project-root", str(retro), "up", "--upstream", url])
+        check(rc == 0 and "retrofit" in last_output[0] and "v1.0.0" in last_output[0] and not (retro / INSTALLED_FILE).exists(),
+              f"T11 retrofit dry-run guesses v1.0.0, writes nothing:\n{last_output[0]}")
+        rc = quiet_main(["--project-root", str(retro), "up", "--upstream", url, "--apply"])
+        check(rc == 0, f"T11 retrofit apply; rc={rc}\n{last_output[0]}")
+        inst = load_installed(retro)
+        check(inst["nexus_version"] == "1.1.0" and inst["origin"] == "update", "T11 retrofit baseline at 1.1.0")
+        check(b"host edit" in (retro / "knowledge/specs/spec--system--exit-gate.md").read_bytes(), "T11 retrofit keeps the customization")
+        check((retro / "knowledge/specs/spec--system--alpha.md").read_bytes() == up11.read("knowledge/specs/spec--system--alpha.md"), "T11 retrofit updated a clean file")
+        check((retro / "knowledge/specs/spec--system--new.md").is_file(), "T11 retrofit added the new file")
+        check(inst["units"]["knowledge/specs/spec--system--exit-gate.md"].get("customized_at_baseline") is True, "T11 retrofit marks the customization")
+
+        # (d) nexus.py bootstrap from the real template root, against the fixture via the cache.
+        boot = real_root / "nexus.py"
+        if boot.is_file():
+            fresh2 = tmp / "fresh2"
+            fresh2.mkdir()
+            r = subprocess.run([sys.executable, str(boot), "--upstream", url, "--project-root", str(fresh2), "--apply"],
+                               capture_output=True, text=True, env=os.environ.copy(), timeout=300)
+            check(r.returncode == 0 and (fresh2 / ".claude/hooks/nexus-bootstrap.py").is_file()
+                  and load_installed(fresh2)["nexus_version"] == "1.1.0",
+                  f"T11 nexus.py installs via the cache: rc={r.returncode}\n{r.stdout[-600:]}\n{r.stderr[-400:]}")
+            check("v1.1.0" in r.stdout, "T11 nexus.py reports the tag it ran from")
+            r = subprocess.run([sys.executable, str(boot), "--upstream", str(template), "--ref", "v1.1.0",
+                                "--project-root", str(fresh2)], capture_output=True, text=True, timeout=300)
+            check(r.returncode == 0 and "Nothing to write" in r.stdout, f"T11 nexus.py from a local checkout + ref:\n{r.stdout[-300:]}")
     except UpdaterError as e:
         failures.append(f"unexpected UpdaterError during selftest: {e}")
     finally:
@@ -2368,10 +2613,21 @@ def selftest(real_root: pathlib.Path) -> int:
             os.environ["NEXUS_UPSTREAM_CACHE"] = old_cache
         shutil.rmtree(tmp, ignore_errors=True)
 
-    # T6 — the real template's manifest, when run inside it.
+    # T6 — the real template's manifest, when run inside it, and every unit of the real tree extracts.
     if (real_root / MANIFEST_FILE).is_file():
         problems = manifest_problems(real_root)
         check(problems == [], "T6 real manifest in sync: " + "; ".join(problems))
+        real_manifest = json.loads((real_root / MANIFEST_FILE).read_text(encoding="utf-8"))
+        real_owned = {e["path"] for e in real_manifest["entries"]}
+        tree = WorkTree(real_root)
+        for e in real_manifest["entries"]:
+            if e["strategy"] not in COMPARED_STRATEGIES:
+                continue
+            try:
+                got = units_of(e, tree.read(e["path"]), real_owned)
+                check(bool(got), f"T6 real {e['path']} yields at least one unit")
+            except UpdaterError as err:
+                check(False, f"T6 real {e['path']} refused: {err}")
 
     if failures:
         for f in failures:
@@ -2433,6 +2689,24 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--in-session", action="store_true",
                    help="proceed although a Claude Code session looks live (then run /hooks)")
 
+    def write_opts(p: argparse.ArgumentParser) -> None:
+        p.add_argument("--apply", action="store_true", help="actually write (default: dry-run)")
+        p.add_argument("--backup-dir", help="override .nexus/backups/<kind>-<version>-<timestamp>")
+        p.add_argument("--in-session", action="store_true",
+                       help="proceed although a Claude Code session looks live (then run /hooks)")
+        p.add_argument("--allow-dirty", action="store_true", help="proceed with uncommitted changes in the repository")
+
+    i = sub.add_parser("install", help="install Nexus into a directory that has none (dry-run unless --apply)")
+    upstream_opts(i)
+    write_opts(i)
+    i.add_argument("--force", action="store_true", help="install over an existing Nexus")
+
+    u = sub.add_parser("up", help="one command: install, retrofit or update this directory (dry-run unless --apply)")
+    upstream_opts(u)
+    write_opts(u)
+    u.add_argument("--restore", action="append", metavar="PATH", help="as in apply")
+    u.add_argument("--allow-downgrade", action="store_true")
+
     f = sub.add_parser("feedback", help="feedback notes: host side push/status, template side list/show/archive")
     fs = f.add_subparsers(dest="feedback_action")
     fs.add_parser("status", help="host: list notes and their delivery state")
@@ -2470,6 +2744,10 @@ def main(argv: list[str] | None = None) -> int:
             if not args.feedback_action:
                 ap.parse_args(["feedback", "--help"])
             return cmd_feedback(args)
+        if args.command == "install":
+            return cmd_install(args)
+        if args.command == "up":
+            return cmd_up(args)
         ap.print_help()
         return 0
     except UpdaterError as e:

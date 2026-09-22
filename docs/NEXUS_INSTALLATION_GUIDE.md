@@ -34,6 +34,31 @@ From that repository you will copy:
 
 # 📦 PART 1 — Installation (applies to ANY project)
 
+## The one-command way (Nexus 1.2.0 and later)
+
+In the directory where Nexus should live, with a clean git tree:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AlexanderShaburov/Nexus/main/nexus.py | python3 -            # dry-run
+curl -fsSL https://raw.githubusercontent.com/AlexanderShaburov/Nexus/main/nexus.py | python3 - --apply    # install
+```
+
+or copy `nexus.py` from the Nexus repository once and run `python3 nexus.py --apply`. The script clones the Nexus repository into `~/.cache/nexus/` (never into your project), takes the newest release tag, and runs its updater with `up`, which decides what this directory needs:
+
+| It finds | It does |
+|---|---|
+| no Nexus | **install**: every Nexus-owned file from the manifest; your `CLAUDE.md`, `.claude/settings.json` and `.gitignore`, if present, are extended, never replaced; a fresh `CLAUDE.md` gets a project stub for you to fill |
+| Nexus files, no `.nexus/installed.json` | **retrofit**: guesses which release you have by matching files, records the baseline, marks anything you changed as customized, then updates |
+| Nexus with a baseline | **update** (Part 6a) |
+
+Dry-run first, always. `--apply` refuses on an uncommitted tree (`--allow-dirty` overrides) and while a Claude Code session looks live. Backups land under `.nexus/backups/`. It ends with the two things it cannot do for you: `/hooks` inside Claude Code, and `/project-ingest` for an existing project (Part 3).
+
+After that, the project carries its own updater: `python3 tools/nexus-update.py up --apply` does the same next time.
+
+Steps 1–4c below are the manual route, kept for reference and for releases before 1.2.0.
+
+---
+
 ## Step 1 — Copy Nexus into your project
 
 From the Nexus template repository, copy into your project root:
@@ -123,7 +148,7 @@ That file is per-user pane layout, rewritten on every use. The rest of `knowledg
 ## Step 4b — Confirm the vault validates
 
 ```bash
-python3 tools/validate-vault.py --selftest   # expect: 30/30 passed
+python3 tools/validate-vault.py --selftest   # expect: 31/31 passed
 python3 tools/validate-vault.py              # expect: 0 error(s), exit 0
 ```
 
@@ -373,10 +398,12 @@ python3 tools/nexus-update.py status     # your local state against the baseline
 To adopt the new version, from a **plain terminal**, not from inside a Claude Code session (the update rewrites the hooks that govern the session):
 
 ```bash
-python3 tools/nexus-update.py apply            # dry-run: lists what would be written
-python3 tools/nexus-update.py apply --apply    # writes, with backups under .nexus/backups/
+python3 tools/nexus-update.py up               # dry-run: lists what would be written
+python3 tools/nexus-update.py up --apply       # writes, with backups under .nexus/backups/
 git add -A && git commit -m "chore(nexus): update to <version>"
 ```
+
+`up` is `apply` plus auto-detection (install / retrofit / update) and the clean-tree guard; `apply` remains for scripts that want exactly the update step. A project that has Nexus but no `.nexus/installed.json` yet needs no separate `baseline` step: `up` guesses the installed release and records it before updating.
 
 Then, in Claude Code, run `/hooks`.
 

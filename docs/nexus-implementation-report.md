@@ -30,8 +30,8 @@ Contract sources of truth: `knowledge/specs/spec--system--session-bootstrap.md`,
 Run from the repo root. All must pass before any behavioral testing.
 
 ```bash
-# S1 — every hook compiles
-for f in .claude/hooks/*.py; do python3 -m py_compile "$f" && echo "OK $f" || echo "FAIL $f"; done
+# S1 — every hook, tool and the bootstrap compiles
+for f in .claude/hooks/*.py tools/*.py nexus.py; do python3 -m py_compile "$f" && echo "OK $f" || echo "FAIL $f"; done
 
 # S2 — executable bit + shebang on every entry-point hook
 for f in .claude/hooks/nexus-*.py; do
