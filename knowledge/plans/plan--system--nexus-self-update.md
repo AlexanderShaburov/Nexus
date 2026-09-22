@@ -318,6 +318,8 @@ Phase boundaries are pause points per `spec--system--knowledge-driven-task-orche
 
 Release `v1.2.0` (2026-09-22): the installer (`install`, `up`, `nexus.py`), the index-entry keying fix, the `LK002` link rule and the feedback channel's F3 guidance. First release the bootstrap can run from. Phase 5 (retrofit of Liquid_Nexus and the other hosts) is now a one-command operator step per installation guide Part 1.
 
+Release `v1.3.0` (2026-09-22): the `plan_status` field contributed by Liquid_Nexus (frontmatter spec, orchestration spec, validator rules `PS001`/`PS002`/`PS100`), and the apply-report count fix. First release that carries a host contribution back to hosts; `up` in Liquid_Nexus should turn its two remaining customizations into updates.
+
 Release `v1.1.0` (2026-09-22): everything after `v1.0.0`, that is `check`, `plan`, `apply`, the core freeze, the notifier and the feedback channel. Procedure per spec §1 and report S8: bump `nexus.version`, regenerate the manifest, all checks green, commit, tag on that commit, push both.
 
 ### 10a. Design requirement: the same engine installs
