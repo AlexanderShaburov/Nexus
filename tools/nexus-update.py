@@ -1880,7 +1880,9 @@ def perform_apply(project_root: pathlib.Path, installed: dict, source: WorkTree 
         print("ERROR: --restore path(s) not in the target manifest: " + ", ".join(unknown), file=sys.stderr)
         return 1
     ops, new_installed = compute_apply(project, installed, source, manifest, rows, restore)
-    blocking = sum(len(rows[c]) for c in BLOCKING_CLASSES)
+    # Rows restored in this run are no longer blocking.
+    blocking = sum(1 for c in BLOCKING_CLASSES for r in rows[c]
+                   if not (r["path"] in restore and c in RESTORE_CLASSES and r["upstream"] is not None))
     hooks_touched = any(o["group"] == "hooks" for o in ops)
     mode = "APPLY" if do_apply else "DRY-RUN"
 
