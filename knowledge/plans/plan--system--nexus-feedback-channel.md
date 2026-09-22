@@ -6,6 +6,7 @@ created: 2026-09-22
 updated: 2026-09-22
 source_of_truth: false
 knowledge_visibility: development
+plan_status: implemented
 theme: nexus-self-update
 tags: [plan, feedback, hosts, inbox, upstream, knowledge-vault]
 ---
@@ -168,4 +169,9 @@ The three questions raised with this proposal were answered as proposed:
 2. A note's `status` in the host stays **manual**; the updater may *suggest* "this note's `touches` were just updated" in `apply` output but never marks a note fixed.
 3. `praise` notes **are delivered**: knowing what must not break is as useful upstream as knowing what is broken.
 
-Plan status is unchanged (proposed); implementation starts after Phase 4 of the self-update plan.
+## 8. First contribution, and what it showed (2026-09-22)
+
+The first change to travel from a host into the template was the `plan_status` field, found during the Liquid_Nexus retrofit as a `conflict` in two specs. It did **not** travel through the mailbox: the Nexus agent works in a sandbox with its own home directory, so the operator's `~/.cache/nexus/inbox` is invisible to it, and the diff was pasted into the session instead. Two consequences:
+
+- The mailbox is right when the template session and the hosts share a machine *and* a home. When the template is worked on from a sandbox, this is the Transport B case (§5) even on one machine. Interim workaround: point `NEXUS_UPSTREAM_CACHE` at a directory inside the mounted project tree so both sides see it, or paste the diff.
+- Reviewing a retrofit's `conflict` rows with `plan --diff` is itself a feedback source: lines the host has and the template lacks are candidate contributions. The guide's Part 6a says so.

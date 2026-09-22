@@ -6,7 +6,7 @@ created: 2026-04-17
 updated: 2026-09-22
 source_of_truth: true
 knowledge_visibility: binding
-tags: [frontmatter, metadata, kb-system, feedback]
+tags: [frontmatter, metadata, kb-system, feedback, plan-status]
 ---
 
 ## Relations
@@ -184,6 +184,7 @@ Rule 3 below forbids unknown fields. These are the fields registered so far beyo
 | `theme` | `type: session`, and any document produced under a themed working session | `nexus-session-writer.py`, agent | working-session theme slug, mirroring `.nexus/session-theme.txt`; groups documents belonging to one line of work |
 | `session_id` | `type: session` | `nexus-session-writer.py` | Claude Code session identifier the archive was generated from |
 | `governs` | `type: spec` | agent | list of subsystems or concerns the spec has authority over |
+| `plan_status` | `type: plan` only | agent | execution lifecycle of the planned work; see below |
 | `kind` | `type: feedback` only (required) | agent | `bug`, `wish` or `praise` |
 | `nexus_version` | `type: feedback` only (required) | agent | Nexus version installed in the host when the note was written (`unknown` before a baseline exists) |
 | `host` | `type: feedback` only (required) | agent | kebab-case name of the host project |
@@ -191,6 +192,21 @@ Rule 3 below forbids unknown fields. These are the fields registered so far beyo
 | `delivered` | `type: feedback` only | `tools/nexus-update.py feedback push` | list of delivery receipts (`inbox:<timestamp>`, `issue:#<n>`); empty until delivered |
 
 Fields written by a hook are **machine-owned**: do not hand-edit them, and do not remove them when editing the document body. Using a `type: feedback` field on any other type is a validation error (`FB004`); a feedback note also has a fixed body shape (three H2 sections), defined and validated per `spec--system--feedback-channel.md`.
+
+#### `plan_status` — why it is a separate field
+
+`spec--system--knowledge-driven-task-orchestration.md` §"Planning Artifacts" requires every plan to carry an explicit status from `proposed | in_progress | implemented | rejected | superseded`. None of those are in the `status` enum, and they should not be: the two fields answer different questions.
+
+- **`status`** — maturity of *the document*. Has this plan been reviewed and accepted as a plan? (`draft` → `approved`.)
+- **`plan_status`** — lifecycle of *the work the plan describes*. Has it been started, finished, abandoned? (`proposed` → `in_progress` → `implemented`.)
+
+They move independently. An approved plan whose work has not begun is `status: approved`, `plan_status: proposed`. A draft plan someone already started executing is `status: draft`, `plan_status: in_progress`.
+
+Allowed values: `proposed`, `in_progress`, `implemented`, `rejected`, `superseded` (underscores, matching the orchestration spec). The validator rejects any other value (`PS001`) and the field on any other type (`PS002`).
+
+SHOULD be present on every `type: plan` document; its absence is a warning (`PS100`), not an error, so existing plans stay valid. `rejected` and `superseded` normally pair with `status: deprecated` and `knowledge_visibility: historical`.
+
+> Provenance: contributed by the Liquid_Nexus host on 2026-09-22, the first change to travel from a host back into the template. Closing the `status` enum had made the orchestration spec's requirement unsatisfiable; two agents hit it independently the same day (one worked around it with a "Plan status:" line in the body). Resolved here.
 
 ---
 

@@ -6,6 +6,7 @@ created: 2026-09-22
 updated: 2026-09-22
 source_of_truth: false
 knowledge_visibility: development
+plan_status: in_progress
 theme: nexus-self-update
 tags: [plan, self-update, upgrade, manifest, baseline, three-way-merge, hooks]
 ---
@@ -28,7 +29,7 @@ tags: [plan, self-update, upgrade, manifest, baseline, three-way-merge, hooks]
 
 Plan status: **in_progress** (approved by the operator on 2026-09-22 with the decisions in §12; Phases 1–4 and 6 implemented the same day, see §10. Phase 5 (retrofit of Liquid_Nexus and the other hosts) runs on the operator's machine with `nexus.py` once `v1.2.0` is tagged. `v1.0.0` is tagged on `ac83f1c` and pushed; it is the first release the updater can target.)
 
-The frontmatter `status` is `draft` because the closed enum in `spec--system--document-frontmatter.md` has no `proposed` value; the plan-level status lives in this line, as in `plan--system--context-decision-claim.md`.
+The plan-level lifecycle is carried by the `plan_status` frontmatter field (registered on 2026-09-22 from a Liquid_Nexus contribution); before that it lived only in this line.
 
 ---
 

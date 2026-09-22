@@ -46,8 +46,12 @@ FEEDBACK_REQUIRED = ["kind", "nexus_version", "host"]
 FEEDBACK_KINDS = {"bug", "wish", "praise"}
 FEEDBACK_SECTIONS = ["## What happened", "## What is proposed", "## Attachment"]
 
+# plan_status: lifecycle of the work a plan describes, distinct from the document's `status`
+# (spec--system--document-frontmatter.md §"plan_status"; contributed by Liquid_Nexus 2026-09-22).
+PLAN_STATUSES = {"proposed", "in_progress", "implemented", "rejected", "superseded"}
+
 REGISTERED_FIELDS = (
-    set(REQUIRED_FIELDS) | {"knowledge_visibility", "theme", "session_id", "governs"} | FEEDBACK_FIELDS
+    set(REQUIRED_FIELDS) | {"knowledge_visibility", "theme", "session_id", "governs", "plan_status"} | FEEDBACK_FIELDS
 )
 
 # type -> directories where that type may live
@@ -301,6 +305,18 @@ def validate_document(path: pathlib.Path, root: pathlib.Path, check_links: bool)
                     "field or the workflow state; do not guess.",
                 )
 
+    # -- plan_status (plans only) ------------------------------------------
+    plan_status = values.get("plan_status")
+    if doc_type == "plan":
+        if plan_status is None:
+            add(2, "PS100", "warning", "plan_status is absent — declare the work's lifecycle "
+                f"({', '.join(sorted(PLAN_STATUSES))})")
+        elif not isinstance(plan_status, str) or plan_status not in PLAN_STATUSES:
+            add(ln("plan_status"), "PS001", "error",
+                f"plan_status {plan_status!r} must be one of {', '.join(sorted(PLAN_STATUSES))}")
+    elif plan_status is not None:
+        add(ln("plan_status"), "PS002", "error", "plan_status is registered for type: plan only")
+
     # -- feedback notes (spec--system--feedback-channel.md) -----------------
     if doc_type == "feedback":
         for field in FEEDBACK_REQUIRED:
@@ -428,6 +444,21 @@ Relax the regex.
 none
 """
 
+PLAN_DOC = """---
+type: plan
+scope: system
+status: draft
+created: 2026-01-01
+updated: 2026-01-02
+source_of_truth: false
+knowledge_visibility: development
+plan_status: in_progress
+tags: [plan]
+---
+
+# A plan
+"""
+
 CASES: list[tuple[str, str, str, str]] = [
     # (expected code, directory, filename, content)
     ("FM001", "specs", "spec--system--x.md", "# no frontmatter\n"),
@@ -455,6 +486,9 @@ CASES: list[tuple[str, str, str, str]] = [
     ("FB003", "feedback", "feedback--nexus--x.md", FEEDBACK_NOTE.replace("## Attachment", "## Patch")),
     ("FB004", "specs", "spec--system--x.md", GOOD.replace("tags: [a, b]", "tags: [a, b]\nkind: bug")),
     ("FB005", "feedback", "feedback--nexus--x.md", FEEDBACK_NOTE.replace("touches: [.claude/hooks/nexus-exit-gate.py]", "touches: one-file")),
+    ("PS001", "plans", "plan--system--x.md", PLAN_DOC.replace("plan_status: in_progress", "plan_status: done")),
+    ("PS002", "specs", "spec--system--x.md", GOOD.replace("tags: [a, b]", "tags: [a, b]\nplan_status: proposed")),
+    ("PS100", "plans", "plan--system--x.md", PLAN_DOC.replace("plan_status: in_progress\n", "")),
 ]
 
 # Shapes that MUST validate clean.
@@ -480,6 +514,8 @@ CLEAN: list[tuple[str, str, str]] = [
          .replace("tags: [a, b]", "tags: [a, b]\ntheme: theme\nsession_id: deadbeef-1111")),
     # a well-formed feedback note
     ("feedback", "feedback--nexus--exit-gate-regex.md", FEEDBACK_NOTE),
+    # a plan carrying plan_status
+    ("plans", "plan--system--x.md", PLAN_DOC),
 ]
 
 

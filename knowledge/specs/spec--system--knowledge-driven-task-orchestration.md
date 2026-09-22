@@ -6,7 +6,7 @@ created: 2026-04-17
 updated: 2026-09-22
 source_of_truth: true
 knowledge_visibility: binding
-tags: [knowledge, orchestration]
+tags: [knowledge, orchestration, plan-status]
 ---
 
 ## Relations
@@ -187,13 +187,15 @@ Claude SHOULD create or update a plan when:
 - the solution is not trivial;
 - future traceability is important.
 
-Plan statuses MUST be explicit:
+Plan statuses MUST be explicit. They are carried in the **`plan_status`** frontmatter field (registered in `spec--system--document-frontmatter.md`):
 
 - proposed
 - in_progress
 - implemented
 - rejected
 - superseded
+
+`plan_status` is NOT the same field as `status`. `status` records the maturity of the plan *document* (`draft | in-progress | review | approved | deprecated`); `plan_status` records the lifecycle of the *work the plan describes*. The two move independently: an approved plan whose work has not begun is `status: approved`, `plan_status: proposed`. Writing one of the values above into `status` is a contract violation and the vault validator rejects it (`FM007`).
 
 ## Phase progression rule
 
