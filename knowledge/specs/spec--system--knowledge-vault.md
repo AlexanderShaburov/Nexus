@@ -6,7 +6,7 @@ created: 2026-04-18
 updated: 2026-09-22
 source_of_truth: true
 knowledge_visibility: binding
-tags: [knowledge-vault, structure, ontology]
+tags: [knowledge-vault, structure, ontology, feedback]
 ---
 
 ## Relations
@@ -58,6 +58,7 @@ knowledge/
   bugs/
   business/
   decisions/
+  feedback/
   glossary/
   index/
   invariants/
@@ -171,6 +172,23 @@ Stores **execution traces of agent work**.
   - actions
   - reasoning summary
   - outcomes
+
+---
+
+### 📁 feedback/
+
+#### Role
+Observations about the **Nexus system** made while using it in this project: bugs, wishes, praise. Written in the host, delivered upstream (`spec--system--feedback-channel.md`), never source of truth here.
+
+#### Allowed
+- `type: feedback` notes with `scope: nexus`
+
+#### Forbidden
+- anything about the project's own domain (that belongs to `bugs/`, `open-questions/`, `plans/`)
+- edits to Nexus core files disguised as notes: a note *proposes*, the template *decides*
+
+#### Note
+Never owned or touched by the Nexus updater; the template's own `feedback/` holds only the format fixture.
 
 ---
 

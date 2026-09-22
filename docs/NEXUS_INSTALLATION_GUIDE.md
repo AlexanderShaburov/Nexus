@@ -123,7 +123,7 @@ That file is per-user pane layout, rewritten on every use. The rest of `knowledg
 ## Step 4b — Confirm the vault validates
 
 ```bash
-python3 tools/validate-vault.py --selftest   # expect: 24/24 passed
+python3 tools/validate-vault.py --selftest   # expect: 30/30 passed
 python3 tools/validate-vault.py              # expect: 0 error(s), exit 0
 ```
 

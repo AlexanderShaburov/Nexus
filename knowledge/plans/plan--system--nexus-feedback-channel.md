@@ -1,7 +1,7 @@
 ---
 type: plan
 scope: system
-status: draft
+status: in-progress
 created: 2026-09-22
 updated: 2026-09-22
 source_of_truth: false
@@ -24,7 +24,7 @@ tags: [plan, feedback, hosts, inbox, upstream, knowledge-vault]
 
 # Plan: Nexus feedback channel (hosts → template)
 
-Plan status: **proposed** (operator asked for the design on 2026-09-22 after agreeing to freeze the Nexus core in hosts; nothing is implemented).
+Plan status: **in_progress** (approved by the operator on 2026-09-22 with the answers in §7; F1 implemented the same day, see §6. F2–F3 not started, F4 deferred.)
 
 ---
 
@@ -151,7 +151,7 @@ Runs after Phase 4 of the self-update plan, because it borrows the cache directo
 | Phase | Deliverable | Files | Acceptance |
 |---|---|---|---|
 | F0 | this proposal | this document | operator review |
-| F1 | the document type | `spec--system--document-frontmatter.md` (type `feedback`, five extension fields), `spec--system--knowledge-vault.md` (`feedback/` role), `tools/validate-vault.py` (`TYPE_DIRS`, fixed-section check, `scope: nexus` allowed), one example note in the template under `knowledge/feedback/` marked `status: deprecated` as a fixture | `validate-vault.py --selftest` has fixtures for a valid note, a missing section, an unregistered field; `python3 tools/validate-vault.py` clean |
+| F1 | the document type | `spec--system--document-frontmatter.md` (type `feedback`, five extension fields), `spec--system--knowledge-vault.md` (`feedback/` role), `tools/validate-vault.py` (`TYPE_DIRS`, fixed-section check, `scope: nexus` allowed), one example note in the template under `knowledge/feedback/` marked `status: deprecated` as a fixture | **Done 2026-09-22.** Validator rules `FB001`–`FB005` with fixtures (required fields, kind enum, fixed sections, feedback fields on other types, list fields) plus a clean note; `spec--system--feedback-channel.md` written in review class (format realized, transports pending); example note `feedback--nexus--format-example.md`; index, architecture and both contract specs mirrored. |
 | F2 | mailbox transport | `feedback push/status/list/show/archive` in `tools/nexus-update.py`; inbox notice in `nexus-update-check.py` | on a throwaway host copy: push delivers, second push is a no-op, edit-then-push delivers again; in the template: the notice appears with one note in the inbox and is silent with none; piping JSON into the hook proves silence when the cache directory is absent |
 | F3 | agent guidance | tool-gate denial text names `knowledge/feedback/`; `CLAUDE.md` "How work proceeds here" gains one sentence for hosts; installation guide section "Sending feedback upstream" | a fresh session in a host copy, told to edit a hook, ends with a note in `knowledge/feedback/` instead of an edit |
 | F4 | issue transport | `feedback push --issue` | deferred; built when a host lives on another machine |

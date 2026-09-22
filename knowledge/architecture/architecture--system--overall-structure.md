@@ -44,6 +44,7 @@ Directories by role:
 - `specs/` — behavioral contracts
 - `decisions/` — rationale
 - `patterns/`, `plans/`, `sessions/`, `bugs/`, `runbooks/`, `glossary/`, `open-questions/`, `business/`
+- `feedback/` — notes about Nexus itself written in a host for delivery upstream (`specs/spec--system--feedback-channel.md`); project-owned, never touched by the updater
 
 ### 2. Enforcement Runtime (`.claude/hooks/`)
 

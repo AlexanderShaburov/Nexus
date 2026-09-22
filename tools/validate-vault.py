@@ -40,13 +40,22 @@ import sys
 
 REQUIRED_FIELDS = ["type", "scope", "status", "created", "updated", "source_of_truth", "tags"]
 
-REGISTERED_FIELDS = set(REQUIRED_FIELDS) | {"knowledge_visibility", "theme", "session_id", "governs"}
+# Fields that exist only on type: feedback (spec--system--feedback-channel.md).
+FEEDBACK_FIELDS = {"kind", "nexus_version", "host", "touches", "delivered"}
+FEEDBACK_REQUIRED = ["kind", "nexus_version", "host"]
+FEEDBACK_KINDS = {"bug", "wish", "praise"}
+FEEDBACK_SECTIONS = ["## What happened", "## What is proposed", "## Attachment"]
+
+REGISTERED_FIELDS = (
+    set(REQUIRED_FIELDS) | {"knowledge_visibility", "theme", "session_id", "governs"} | FEEDBACK_FIELDS
+)
 
 # type -> directories where that type may live
 TYPE_DIRS = {
     "architecture": {"architecture"},
     "bug": {"bugs"},
     "decision": {"decisions", "business"},
+    "feedback": {"feedback"},
     "glossary": {"glossary"},
     "index": {"index"},
     "invariant": {"invariants"},
@@ -292,6 +301,25 @@ def validate_document(path: pathlib.Path, root: pathlib.Path, check_links: bool)
                     "field or the workflow state; do not guess.",
                 )
 
+    # -- feedback notes (spec--system--feedback-channel.md) -----------------
+    if doc_type == "feedback":
+        for field in FEEDBACK_REQUIRED:
+            if field not in values:
+                add(2, "FB001", "error", f"feedback note is missing required field {field!r}")
+        kind = values.get("kind")
+        if isinstance(kind, str) and kind not in FEEDBACK_KINDS:
+            add(ln("kind"), "FB002", "error", f"kind {kind!r} must be one of {', '.join(sorted(FEEDBACK_KINDS))}")
+        for field in ("touches", "delivered"):
+            if field in values and not isinstance(values[field], list):
+                add(ln(field), "FB005", "error", f"{field} must be a list: [a, b] or '- item' lines")
+        body = text[m.end():]
+        for heading in FEEDBACK_SECTIONS:
+            if not re.search(rf"(?m)^{re.escape(heading)}\s*$", body):
+                add(2, "FB003", "error", f"feedback note lacks the fixed section {heading!r}")
+    else:
+        for key in sorted(FEEDBACK_FIELDS & set(values)):
+            add(ln(key), "FB004", "error", f"field {key!r} is registered for type: feedback only")
+
     # -- filename ----------------------------------------------------------
     fname = path.name
     if not NAME_RE.match(fname):
@@ -361,6 +389,37 @@ tags: [a, b]
 # Fine
 """
 
+FEEDBACK_NOTE = """---
+type: feedback
+scope: nexus
+status: draft
+created: 2026-01-01
+updated: 2026-01-02
+source_of_truth: false
+knowledge_visibility: development
+kind: bug
+nexus_version: 1.0.0
+host: liquid-nexus
+touches: [.claude/hooks/nexus-exit-gate.py]
+delivered: []
+tags: [feedback, nexus]
+---
+
+# Exit gate blocks a compliant closure
+
+## What happened
+
+The gate denied a valid block.
+
+## What is proposed
+
+Relax the regex.
+
+## Attachment
+
+none
+"""
+
 CASES: list[tuple[str, str, str, str]] = [
     # (expected code, directory, filename, content)
     ("FM001", "specs", "spec--system--x.md", "# no frontmatter\n"),
@@ -382,6 +441,11 @@ CASES: list[tuple[str, str, str, str]] = [
     ("NM002", "plans", "spec--system--x.md", GOOD),
     ("NM003", "specs", "plan--system--x.md", GOOD),
     ("LK001", "specs", "spec--system--x.md", GOOD + "\n[gone](./nowhere.md)\n"),
+    ("FB001", "feedback", "feedback--nexus--x.md", FEEDBACK_NOTE.replace("host: liquid-nexus\n", "")),
+    ("FB002", "feedback", "feedback--nexus--x.md", FEEDBACK_NOTE.replace("kind: bug", "kind: rant")),
+    ("FB003", "feedback", "feedback--nexus--x.md", FEEDBACK_NOTE.replace("## Attachment", "## Patch")),
+    ("FB004", "specs", "spec--system--x.md", GOOD.replace("tags: [a, b]", "tags: [a, b]\nkind: bug")),
+    ("FB005", "feedback", "feedback--nexus--x.md", FEEDBACK_NOTE.replace("touches: [.claude/hooks/nexus-exit-gate.py]", "touches: one-file")),
 ]
 
 # Shapes that MUST validate clean.
@@ -405,6 +469,8 @@ CLEAN: list[tuple[str, str, str]] = [
          .replace("source_of_truth: true", "source_of_truth: false")
          .replace("status: approved", "status: deprecated")
          .replace("tags: [a, b]", "tags: [a, b]\ntheme: theme\nsession_id: deadbeef-1111")),
+    # a well-formed feedback note
+    ("feedback", "feedback--nexus--exit-gate-regex.md", FEEDBACK_NOTE),
 ]
 
 

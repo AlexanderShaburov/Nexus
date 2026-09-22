@@ -28,7 +28,7 @@ The vault enforces the Nexus lifecycle (Bootstrap → Decision → Execution →
 7. **sessions/** — execution traces from prior sessions
 8. **glossary/** — domain terminology
 
-`bugs/`, `open-questions/`, `runbooks/`, `business/` are consulted on demand.
+`bugs/`, `open-questions/`, `runbooks/`, `business/` are consulted on demand. `feedback/` holds notes about Nexus itself, written in a host for delivery upstream; it is never project knowledge.
 
 ---
 
@@ -83,6 +83,10 @@ Hooks live outside the vault under `.claude/hooks/` and operate against runtime 
 - `tools/validate-vault.py` — the vault rule set and its CLI. Holds the machine-checkable form of the frontmatter, naming and visibility contracts; `nexus-vault-validator.py` is a thin adapter over it. Run `python3 tools/validate-vault.py` before declaring a vault edit finished, `--selftest` after changing a rule.
 - `tools/nexus-decide.py` — the Context Decision claim: the tool-carried form of the per-turn decision (context-decision-gate spec, Form A). Validates and prints; decides nothing. Design origin: [Plan: Context Decision claim](../plans/plan--system--context-decision-claim.md) (development class).
 - `tools/nexus-update.py` — the updater: `manifest generate|verify` keeps `nexus.manifest.json` (the list of Nexus-owned paths) in sync with the tree; `baseline` records `.nexus/installed.json` in a host; `status` compares a host with its baseline; `check` asks upstream for a newer version; `plan` prints the three-way table; `apply` adopts a version with backups and validation; `--selftest` proves the rules. Architecture §2d. Contract: [Nexus Update](../specs/spec--system--nexus-update.md). Design origin: [Plan: Nexus self-update](../plans/plan--system--nexus-self-update.md) (development class).
+
+## Specs in review (development class)
+
+- [Feedback Channel](../specs/spec--system--feedback-channel.md) — the `type: feedback` note a host writes about Nexus (format realized and validated) and the mailbox / issue transports (pending); promoted to binding when `feedback push` lands.
 
 ## Plans (development class)
 

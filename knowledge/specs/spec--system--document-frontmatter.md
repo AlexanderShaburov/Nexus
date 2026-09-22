@@ -6,7 +6,7 @@ created: 2026-04-17
 updated: 2026-09-22
 source_of_truth: true
 knowledge_visibility: binding
-tags: [frontmatter, metadata, kb-system]
+tags: [frontmatter, metadata, kb-system, feedback]
 ---
 
 ## Relations
@@ -64,6 +64,7 @@ Allowed values, with their canonical directory:
 | `architecture` | `architecture/` | structural description — what exists |
 | `bug` | `bugs/` | defect record |
 | `decision` | `decisions/`, `business/` | rationale for a choice (ADRs use this type) |
+| `feedback` | `feedback/` | observation about the Nexus system made in a host project, for delivery upstream (contract: `spec--system--feedback-channel.md`) |
 | `glossary` | `glossary/` | domain terminology |
 | `index` | `index/` | routing entry point |
 | `invariant` | `invariants/` | non-negotiable constraint |
@@ -85,6 +86,7 @@ Defines the domain or subsystem.
 
 Examples:
 - system
+- nexus — reserved for `type: feedback`: the subject is the Nexus system itself, observed from a host
 - backend
 - frontend
 - editor
@@ -182,8 +184,13 @@ Rule 3 below forbids unknown fields. These are the fields registered so far beyo
 | `theme` | `type: session`, and any document produced under a themed working session | `nexus-session-writer.py`, agent | working-session theme slug, mirroring `.nexus/session-theme.txt`; groups documents belonging to one line of work |
 | `session_id` | `type: session` | `nexus-session-writer.py` | Claude Code session identifier the archive was generated from |
 | `governs` | `type: spec` | agent | list of subsystems or concerns the spec has authority over |
+| `kind` | `type: feedback` only (required) | agent | `bug`, `wish` or `praise` |
+| `nexus_version` | `type: feedback` only (required) | agent | Nexus version installed in the host when the note was written (`unknown` before a baseline exists) |
+| `host` | `type: feedback` only (required) | agent | kebab-case name of the host project |
+| `touches` | `type: feedback` only | agent | list of Nexus-owned paths the note is about |
+| `delivered` | `type: feedback` only | `tools/nexus-update.py feedback push` | list of delivery receipts (`inbox:<timestamp>`, `issue:#<n>`); empty until delivered |
 
-Fields written by a hook are **machine-owned**: do not hand-edit them, and do not remove them when editing the document body.
+Fields written by a hook are **machine-owned**: do not hand-edit them, and do not remove them when editing the document body. Using a `type: feedback` field on any other type is a validation error (`FB004`); a feedback note also has a fixed body shape (three H2 sections), defined and validated per `spec--system--feedback-channel.md`.
 
 ---
 
