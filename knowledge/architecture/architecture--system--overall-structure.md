@@ -3,8 +3,9 @@ type: architecture
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-05-04
+updated: 2026-09-22
 source_of_truth: true
+knowledge_visibility: binding
 tags: [architecture, system, nexus, lifecycle]
 ---
 
@@ -50,12 +51,36 @@ Shell + Python scripts invoked by Claude Code at lifecycle events. They read and
 
 - `nexus-bootstrap.py` — runs on `SessionStart` and `PreCompact`. Resets state, injects the Mandatory Startup Reading Set.
 - `nexus-prompt-gate.py` — runs on `UserPromptSubmit`. Resets per-turn state and injects Decision Gate + Exit Gate reminders. Hard-blocks prompts while bootstrap is pending unless the prompt is a read-only KB query.
-- `nexus-tool-gate.py` — runs on `PreToolUse`. While bootstrap pending, only `Read`/`Glob`/`Grep`/`LS` of `knowledge/` are allowed. Tracks read-ledger to auto-complete bootstrap. After bootstrap, non-read tools require a Decision Gate statement in the current turn.
+- `nexus-tool-gate.py` — runs on `PreToolUse`. While bootstrap pending, only read-only tools (`Read`/`Glob`/`Grep`/`LS`/`NotebookRead`) are allowed, on any path — reads cannot mutate, so the gate constrains tool class, not location. Tracks read-ledger to auto-complete bootstrap. After bootstrap, non-read tools require a Decision Gate statement in the current turn.
 - `nexus-exit-gate.py` — runs on `Stop`. Parses transcript, validates Closure Block presence + field shape + dependency rules. Blocks completion with a `reason` on violation.
+
+### 2a. Session Archival (`.claude/hooks/nexus-session-writer.py`)
+
+A **non-enforcing** hook registered on the same `Stop` event as the exit gate. It is part of the runtime but not part of the enforcement layer: it evaluates no contract, emits nothing on stdout, and swallows its own exceptions so it can never block turn completion or interfere with `nexus-exit-gate.py`.
+
+Behavior:
+
+- reads the session transcript and reconstructs `(user prompt, assistant text)` turn pairs, discarding tool calls, tool results, thinking blocks, `<system-reminder>` and `<command-*>` tags;
+- writes `knowledge/sessions/session--<theme>--<YYYY-MM-DD>--<session-id8>.md`, rewriting the same file in place on every `Stop` (idempotent per session);
+- reads the theme from `.nexus/session-theme.txt` and tracks the current target in `.nexus/session-file.txt`; when the theme changes **within the same session** the existing file is renamed rather than duplicated, so one session stays one document. The marker is **session-scoped** (`{"session_id", "path"}`): it outlives the session that wrote it, so an unscoped marker would let the next session claim the previous session's archive and overwrite it. A rename requires a `session_id` match, and never clobbers an existing target;
+- preserves the original `created:` value across rewrites and bumps `updated:`.
+
+Emitted documents carry `type: session`, `status: draft`, `source_of_truth: false`, `knowledge_visibility: historical`. They are an audit trail, not authoritative knowledge, and are distinct from the hand-written `summary--<theme>--<date>.md` handoff documents.
+
+### 2b. Vault Validation (`tools/validate-vault.py` + `.claude/hooks/nexus-vault-validator.py`)
+
+The frontmatter contract is machine-checked rather than left to agent discipline. The rules had drifted from the vault for months before a manual audit caught it; this closes that loop.
+
+- `tools/validate-vault.py` is the **single source of truth for the rules** and the user-facing CLI. It codifies `spec--system--document-frontmatter.md`, the naming convention in `spec--system--knowledge-vault.md`, and the invalid-combination table in `spec--system--knowledge-visibility.md`. Stdlib only; its frontmatter parser accepts exactly the YAML subset the spec permits. Findings carry stable codes (`FM…` frontmatter, `VS…` visibility, `NM…` naming, `LK…` links). Errors exit 1, warnings exit 0 unless `--strict`. `--selftest` proves every rule fires against fixtures.
+- `.claude/hooks/nexus-vault-validator.py` is a thin `PostToolUse` adapter for `Edit`/`Write`/`MultiEdit`/`NotebookEdit`. It validates the single document just written, if it lives under `knowledge/`, and injects the findings as `additionalContext` so the problem surfaces while the edit is still in working context. Silent when the document is clean.
+
+The hook is **advisory and non-enforcing**. `PostToolUse` fires after the write, so it cannot prevent one; and neither layer ever edits a document — `spec--system--knowledge-visibility.md` rule 4 requires invalid combinations to be surfaced for judgement, not silently normalized.
 
 ### 3. Runtime State (`.nexus/`)
 
-- `.nexus/state.json` — per-session runtime state (bootstrap status, read-ledger, per-turn decision flag, prompt index). Ephemeral; regenerated at each `SessionStart`.
+- `.nexus/state.json` — per-session runtime state (bootstrap status, read-ledger, per-turn decision flag, prompt index). Ephemeral; regenerated at each `SessionStart`. Gitignored.
+- `.nexus/session-theme.txt` — optional single-line theme slug used by the session writer to name the archive file.
+- `.nexus/session-file.txt` — JSON `{"session_id", "path"}` identifying the archive the session writer currently owns, so a theme change renames instead of forking, and a *different* session never renames it.
 - `.nexus/README.md` — explains the directory.
 
 ### 4. Project Instructions
@@ -80,16 +105,26 @@ UserPromptSubmit
 
 PreToolUse
   └─> nexus-tool-gate.py
-        ├─ if bootstrap pending: allow only read-tools on knowledge/
+        ├─ if bootstrap pending: allow only read-only tools (any path)
         ├─ if bootstrap pending and Read hits a required file: record; upgrade if complete
         └─ if bootstrap done and tool is mutating: require Decision Gate text in current turn
 
+PostToolUse (Edit|Write|MultiEdit|NotebookEdit)
+  └─> nexus-vault-validator.py   (non-enforcing, advisory)
+        ├─ skip unless the written file is knowledge/**.md
+        ├─ run tools/validate-vault.py rules on that one document
+        └─ inject findings as additionalContext; silent when clean
+
 Stop
-  └─> nexus-exit-gate.py
-        ├─ locate last user turn in transcript
-        ├─ regex-match Closure Block in assistant text of that turn
-        ├─ validate fields + dependency rules
-        └─ block (decision=block) if violation
+  ├─> nexus-exit-gate.py
+  │     ├─ locate last user turn in transcript
+  │     ├─ regex-match Closure Block in assistant text of that turn
+  │     ├─ validate fields + dependency rules
+  │     └─ block (decision=block) if violation
+  └─> nexus-session-writer.py   (non-enforcing, silent)
+        ├─ reconstruct turn pairs from transcript
+        ├─ rename prior archive if .nexus/session-theme.txt changed
+        └─ rewrite knowledge/sessions/session--<theme>--<date>--<id8>.md
 ```
 
 ---

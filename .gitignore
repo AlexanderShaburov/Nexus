@@ -1,5 +1,6 @@
 # Nexus runtime state (regenerated per session)
-.nexus/state.json
+# Glob, not a literal: catches macOS/iCloud duplicates like ".nexus/state 2.json"
+.nexus/state*.json
 
 # Nexus patch backups (regenerated per patch apply)
 .nexus/backups/
@@ -13,6 +14,12 @@ __pycache__/
 
 # Personal per-user Claude Code settings (not team-shared)
 .claude/settings.local.json
+
+# Obsidian per-user UI state (open panes and layout; rewritten on every use).
+# The rest of knowledge/.obsidian/ — app, appearance, core-plugins, graph —
+# stays tracked: that is shared vault configuration.
+# Glob also covers workspace-mobile.json.
+knowledge/.obsidian/workspace*.json
 
 # macOS
 .DS_Store

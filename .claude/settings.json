@@ -53,6 +53,19 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/nexus-vault-validator.py",
+            "timeout": 15,
+            "statusMessage": "NEXUS vault validation"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "matcher": "",
@@ -62,6 +75,12 @@
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/nexus-exit-gate.py",
             "timeout": 15,
             "statusMessage": "NEXUS exit gate"
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/nexus-session-writer.py",
+            "timeout": 15,
+            "statusMessage": "NEXUS session writer"
           }
         ]
       }
