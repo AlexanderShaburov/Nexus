@@ -184,6 +184,9 @@ These cannot be scripted; they require a real Claude Code session. Perform them 
 | B12 | Start a *second* session in the same repo and let it reach Stop | The first session's archive is **untouched**; a new file appears alongside it |
 | B13 | Write a document under `knowledge/` with a deliberate frontmatter error | Advisory `NEXUS VAULT VALIDATION` context appears naming the rule code; the write is **not** blocked |
 | B14 | Write a clean document under `knowledge/`, and separately a file outside it | No validation output in either case |
+| B15 | In a **host** copy with `.nexus/installed.json`, pipe `{"tool_name":"Edit","tool_input":{"file_path":"<host>/.claude/hooks/nexus-exit-gate.py"}}` into the tool gate with `CLAUDE_PROJECT_DIR=<host>` and a completed-bootstrap `state.json` | Denied with `NEXUS CORE FILE: .claude/hooks/nexus-exit-gate.py is owned by Nexus <version>` |
+| B16 | Same, after listing that path in `<host>/.nexus/unlock.txt`; and separately an `Edit` on `CLAUDE.md` or a project document | Allowed (`continue: true`) in both cases |
+| B17 | Same `Edit` on a core path in the **template** (no `installed.json`) | Allowed: the freeze is inactive without a baseline |
 
 ### The transcript race (track B4, B9 and B12 carefully)
 
@@ -252,7 +255,7 @@ Do not claim the hooks work until all of these are true:
 
 - [ ] Section 2 static checks S1–S6 and S8 pass
 - [ ] Section 3 fixtures report `FAILURES: 0`, including S7
-- [ ] Section 4 rows B1–B14 observed (B9 assessed against the race note, B4 against the narration note)
+- [ ] Section 4 rows B1–B17 observed (B9 assessed against the race note, B4 against the narration note; B15–B17 are scriptable by piping JSON)
 - [ ] Any hook text that quotes a contract is mirrored in the corresponding spec under `knowledge/specs/`
 - [ ] `knowledge/architecture/architecture--system--overall-structure.md` still describes the actual set of registered hooks, with `updated:` bumped
 - [ ] `.nexus/state.json` is gitignored and no stray `.nexus/state*.json` is staged

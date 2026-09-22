@@ -370,7 +370,19 @@ python3 tools/nexus-update.py status     # your local state against the baseline
 
 `plan` classes: `update` (yours untouched, upstream changed), `add` (new upstream), `customized` (yours changed, upstream not; left alone), `conflict` (both changed; left alone, exit 1), `removed-locally`, `obsolete`, `converged`, `adopt`, `unbaselined`, `mode-drift`, `unchanged`. The upstream repository is cached under `~/.cache/nexus/template`; `--offline` reuses the cache without network.
 
-👉 `apply` is not shipped yet (plan Phase 3). Until then `plan --diff` plus a hand copy is the way to take a single upstream change.
+To adopt the new version, from a **plain terminal**, not from inside a Claude Code session (the update rewrites the hooks that govern the session):
+
+```bash
+python3 tools/nexus-update.py apply            # dry-run: lists what would be written
+python3 tools/nexus-update.py apply --apply    # writes, with backups under .nexus/backups/
+git add -A && git commit -m "chore(nexus): update to <version>"
+```
+
+Then, in Claude Code, run `/hooks`.
+
+`apply` writes only the `update` and `add` rows, backs up every file it touches, rewrites `.nexus/installed.json`, and validates the result (vault clean, hooks compile, `settings.json` sane). `customized` and `conflict` rows are left alone; take a single one deliberately with `apply --apply --restore <path>`. A second run after success changes nothing.
+
+👉 **Core files are frozen in projects.** Once the baseline exists, Claude Code's tool gate refuses to edit a Nexus core file in your project and points to the feedback route instead. If a change truly cannot wait, list the path in `.nexus/unlock.txt`; `status` will report it as customized from then on, and `apply` will never overwrite it.
 
 ---
 

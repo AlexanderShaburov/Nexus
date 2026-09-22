@@ -1,8 +1,8 @@
 {
   "manifest_version": 1,
   "nexus_version": "1.0.0",
-  "generated_from": "66aebd9fa8d6362facf332f8c844afbdf1b66988",
-  "generated_at": "2026-09-22T13:48:51",
+  "generated_from": "60b57a611b83f6b71c8b469eeb6dc0be6c0ad011",
+  "generated_at": "2026-09-22T14:15:00",
   "entries": [
     {
       "path": ".claude/hooks/_nexus_common.py",
@@ -181,6 +181,11 @@
     },
     {
       "path": "knowledge/specs/spec--system--knowledge-visibility.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/specs/spec--system--nexus-update.md",
       "strategy": "replace",
       "group": "vault"
     },

@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""Nexus updater — version identity, ownership manifest, baseline, check and plan.
+"""Nexus updater — version identity, ownership manifest, baseline, check, plan and apply.
 
-Phases 1–2 of knowledge/plans/plan--system--nexus-self-update.md. Subcommands:
+Phases 1–3 of knowledge/plans/plan--system--nexus-self-update.md; contract in
+knowledge/specs/spec--system--nexus-update.md. Subcommands:
 
     manifest generate     (template) write nexus.manifest.json from the tree
     manifest verify       (template) regenerate in memory and diff; used by --selftest
     baseline              (host)     record .nexus/installed.json against an upstream ref
     status                (host)     compare every baselined unit with the working tree
-    check                 (host)     is a newer Nexus available upstream? (network: ls-remote/fetch)
+    check                 (host)     is a newer Nexus available upstream? (network: fetch)
     plan                  (host)     the full three-way table: baseline / local / upstream
-    --selftest                       prove the rules, the extractors and the three-way table
+    apply                 (host)     adopt the target version; dry-run unless --apply
+    --selftest                       prove the rules, the extractors, the table and apply
 
-Project files written: nexus.manifest.json (template, `manifest generate`),
-.nexus/installed.json (host, `baseline`), .nexus/update-check.json (host,
-`check`). Nothing else. `apply` arrives in Phase 3. Stdlib only.
+Without --apply nothing in a host is written except .nexus/update-check.json
+(`check`) and .nexus/installed.json (`baseline`). Stdlib only.
 
 Exit codes: 0 ok / up to date, 1 findings reported (conflicts, unbaselined,
 refused), 2 not a Nexus project, 3 upstream unreachable / ref or manifest
@@ -948,6 +949,327 @@ def read_update_check(project: pathlib.Path) -> dict | None:
 
 
 # --------------------------------------------------------------------------
+# Apply — writers per strategy (plan §7.2–7.4, spec §8)
+# --------------------------------------------------------------------------
+
+STATE_FILE = ".nexus/state.json"
+LIVE_SESSION_SECONDS = 60
+WRITE_CLASSES = {"update", "add"}
+RECORD_CLASSES = {"update", "add", "converged", "adopt"}
+RESTORE_CLASSES = {"customized", "conflict", "removed-locally"}
+
+
+def write_file_atomic(path: pathlib.Path, data: bytes, mode: str | None = None) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".nexus-tmp")
+    tmp.write_bytes(data)
+    if mode == "755":
+        tmp.chmod(tmp.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    elif mode == "644":
+        tmp.chmod(tmp.stat().st_mode & ~(stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
+    os.replace(tmp, path)
+
+
+def set_mode(path: pathlib.Path, mode: str) -> None:
+    cur = path.stat().st_mode
+    if mode == "755":
+        path.chmod(cur | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    else:
+        path.chmod(cur & ~(stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
+
+
+def apply_sections(local: bytes | None, upstream: bytes | None, headings: list[str]) -> bytes:
+    """Replace or append the listed H2 sections of a Markdown file with their upstream text."""
+    text = (local or b"").decode("utf-8", errors="surrogateescape")
+    up_units = units_sections(upstream, headings)
+    parts = h2_sections(text)
+    present = {h for h, _ in parts if h}
+    out: list[str] = []
+    for heading, body in parts:
+        if heading in up_units:
+            out.append(up_units[heading].decode("utf-8", errors="surrogateescape") + "\n")
+        else:
+            out.append(body)
+    result = "\n".join(out)
+    for heading in headings:
+        if heading in up_units and heading not in present:
+            result = result.rstrip("\n") + "\n\n" + up_units[heading].decode("utf-8", errors="surrogateescape") + "\n"
+    if local is None:
+        result = result.lstrip("\n")
+    return result.encode("utf-8", errors="surrogateescape")
+
+
+def _section_of_line(text: str, needle: str) -> str:
+    """H2 heading under which `needle` (a full line, normalized) appears; '' when before any H2."""
+    current = ""
+    for heading, body in h2_sections(text):
+        for line in body.split("\n"):
+            if line.rstrip() == needle:
+                return heading
+        current = heading
+    return current
+
+
+def apply_index_entries(local: bytes | None, upstream: bytes | None, index_rel: str, owned: set[str],
+                        keys: Iterable[str]) -> bytes:
+    """Replace owned index lines in place; insert new ones after the last owned line of the same section."""
+    text = (local or b"").decode("utf-8", errors="surrogateescape").replace("\r\n", "\n")
+    up_text = (upstream or b"").decode("utf-8", errors="surrogateescape")
+    up_units = units_index_entries(upstream, index_rel, owned)
+    local_units = units_index_entries(local, index_rel, owned)
+    lines = text.split("\n")
+    keys = [k for k in keys if k in up_units]
+
+    def key_of(line: str) -> str | None:
+        if not BULLET_RE.match(line):
+            return None
+        m = LINK_RE.search(line)
+        if not m:
+            return None
+        target = m.group(1).split("#", 1)[0]
+        resolved = posixpath.normpath(posixpath.join(posixpath.dirname(index_rel), target))
+        return target if resolved in owned else None
+
+    # Replacements.
+    for i, line in enumerate(lines):
+        k = key_of(line)
+        if k in keys and k in local_units:
+            lines[i] = up_units[k].decode("utf-8", errors="surrogateescape")
+
+    # Insertions, in upstream order.
+    for k in keys:
+        if k in local_units:
+            continue
+        new_line = up_units[k].decode("utf-8", errors="surrogateescape")
+        section = _section_of_line(up_text, new_line)
+        # Locate the section locally.
+        start = end = None
+        if section:
+            for i, line in enumerate(lines):
+                if start is None and line.rstrip() == section:
+                    start = i
+                    continue
+                if start is not None and line.startswith("## "):
+                    end = i
+                    break
+            if start is not None and end is None:
+                end = len(lines)
+        if start is None:
+            # Section absent (or the line lives before any H2): append a section at EOF.
+            while lines and lines[-1] == "":
+                lines.pop()
+            lines += ["", section, "", new_line] if section else ["", new_line]
+            local_units[k] = b""
+            continue
+        # After the last owned line in the section, else after the last non-blank line of it.
+        insert_at = None
+        for i in range(end - 1, start, -1):
+            if key_of(lines[i]) is not None:
+                insert_at = i + 1
+                break
+        if insert_at is None:
+            insert_at = end
+            while insert_at - 1 > start and lines[insert_at - 1] == "":
+                insert_at -= 1
+        lines.insert(insert_at, new_line)
+        local_units[k] = b""
+    result = "\n".join(lines)
+    if not result.endswith("\n"):
+        result += "\n"
+    return result.encode("utf-8", errors="surrogateescape")
+
+
+def apply_hooks_merge(local: bytes | None, upstream: bytes | None, keys: Iterable[str]) -> bytes:
+    """Make the listed nexus-* hook entries equal to upstream; foreign entries and order are kept."""
+    cfg = json.loads(local.decode("utf-8")) if local else {}
+    up = json.loads(upstream.decode("utf-8")) if upstream else {}
+    hooks = cfg.setdefault("hooks", {})
+    up_hooks = up.get("hooks") or {}
+    for key in keys:
+        event, _, name = key.partition("/")
+        # Find the upstream entry.
+        target = None
+        for group in up_hooks.get(event) or []:
+            for hook in group.get("hooks") or []:
+                m = HOOK_CMD_RE.search(str(hook.get("command", "")))
+                if m and m.group(1) == name:
+                    target = (group.get("matcher", ""), hook)
+        if target is None:
+            continue
+        matcher, hook = target
+        # Remove the local entry wherever it sits.
+        groups = hooks.setdefault(event, [])
+        for group in groups:
+            kept = []
+            for h in group.get("hooks") or []:
+                m = HOOK_CMD_RE.search(str(h.get("command", "")))
+                if m and m.group(1) == name:
+                    continue
+                kept.append(h)
+            group["hooks"] = kept
+        hooks[event] = [g for g in groups if g.get("hooks")]
+        # Add into a group with the same matcher, else a new group.
+        for group in hooks[event]:
+            if group.get("matcher", "") == matcher:
+                group["hooks"].append(json.loads(json.dumps(hook)))
+                break
+        else:
+            hooks[event].append({"matcher": matcher, "hooks": [json.loads(json.dumps(hook))]})
+    return (json.dumps(cfg, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def apply_ensure_lines(local: bytes | None, lines_wanted: list[str]) -> bytes:
+    text = (local or b"").decode("utf-8", errors="surrogateescape")
+    present = {ln.strip() for ln in text.splitlines()}
+    missing = [ln for ln in lines_wanted if ln not in present]
+    if not missing:
+        return (local or b"")
+    if text and not text.endswith("\n"):
+        text += "\n"
+    if text:
+        text += "\n"
+    text += "# Nexus runtime (added by tools/nexus-update.py)\n" + "\n".join(missing) + "\n"
+    return text.encode("utf-8", errors="surrogateescape")
+
+
+def live_session_recent(project_root: pathlib.Path) -> bool:
+    p = project_root / STATE_FILE
+    if not p.is_file():
+        return False
+    import time
+    return (time.time() - p.stat().st_mtime) < LIVE_SESSION_SECONDS
+
+
+def run_post_apply_validation(project_root: pathlib.Path) -> list[str]:
+    """spec §8: vault clean, validator selftest, hooks compile, settings.json sane."""
+    problems: list[str] = []
+    validator = project_root / "tools" / "validate-vault.py"
+    if validator.is_file():
+        for extra in ([], ["--selftest"]):
+            r = subprocess.run([sys.executable, str(validator), "--root", str(project_root), *extra],
+                               capture_output=True, text=True, cwd=str(project_root), timeout=300)
+            if r.returncode != 0:
+                problems.append(f"validate-vault.py {' '.join(extra) or '(vault)'} exit {r.returncode}: "
+                                f"{(r.stdout + r.stderr).strip()[-400:]}")
+    hooks_dir = project_root / ".claude" / "hooks"
+    if hooks_dir.is_dir():
+        import py_compile
+        for f in sorted(hooks_dir.glob("*.py")):
+            try:
+                py_compile.compile(str(f), doraise=True)
+            except py_compile.PyCompileError as e:
+                problems.append(f"{f.relative_to(project_root)} does not compile: {e.msg[:200]}")
+    settings = project_root / ".claude" / "settings.json"
+    if settings.is_file():
+        try:
+            cfg = json.loads(settings.read_text(encoding="utf-8"))
+            for event, groups in (cfg.get("hooks") or {}).items():
+                for g in groups:
+                    for h in g.get("hooks") or []:
+                        cmd = str(h.get("command", "")).replace("$CLAUDE_PROJECT_DIR/", "")
+                        if cmd.startswith(".claude/hooks/") and not (project_root / cmd).is_file():
+                            problems.append(f"settings.json registers a missing hook: {cmd} ({event})")
+        except json.JSONDecodeError as e:
+            problems.append(f".claude/settings.json is not valid JSON after apply: {e}")
+    return problems
+
+
+def compute_apply(project: WorkTree, installed: dict, upstream: WorkTree | GitRef, manifest: dict,
+                  rows: dict[str, list[dict]], restore: set[str]) -> tuple[list[dict], dict]:
+    """Turn the three-way rows into per-file write operations and the next installed.json.
+
+    Returns (ops, new_installed). Each op: {path, group, strategy, action, units, data, mode}.
+    Nothing is written here.
+    """
+    entries = {e["path"]: e for e in manifest["entries"]}
+    owned = set(entries)
+    per_path: dict[str, dict] = {}
+
+    def slot(path: str) -> dict:
+        e = entries[path]
+        return per_path.setdefault(path, {"path": path, "group": e.get("group", "vault"),
+                                          "strategy": e["strategy"], "units": [], "restore": [],
+                                          "mode_fix": False, "entry": e})
+
+    for cls in WRITE_CLASSES:
+        for r in rows[cls]:
+            slot(r["path"])["units"].append(r["unit"])
+    for cls in RESTORE_CLASSES:
+        for r in rows[cls]:
+            if r["path"] in restore and r["upstream"] is not None:
+                s = slot(r["path"])
+                s["units"].append(r["unit"])
+                s["restore"].append(r["unit"])
+    for r in rows["mode-drift"]:
+        slot(r["path"])["mode_fix"] = True
+
+    ops: list[dict] = []
+    for path, s in per_path.items():
+        e = s["entry"]
+        strategy = s["strategy"]
+        local = project.read(path)
+        up = upstream.read(path)
+        data: bytes | None = None
+        if strategy == "replace":
+            if s["units"]:
+                data = up
+        elif strategy == "sections":
+            heads = [u.partition("#")[2] for u in s["units"]]
+            data = apply_sections(local, up, heads)
+        elif strategy == "index-entries":
+            keys = [u.partition("#")[2] for u in s["units"]]
+            data = apply_index_entries(local, up, path, owned, keys)
+        elif strategy == "hooks-merge":
+            keys = [u.partition("#")[2] for u in s["units"]]
+            data = apply_hooks_merge(local, up, keys)
+        elif strategy == "ensure-lines":
+            data = apply_ensure_lines(local, e.get("lines", []))
+        elif strategy == "create-if-absent":
+            data = up if local is None else None
+        if data is not None and data == local and not s["mode_fix"]:
+            data = None
+        if data is None and not s["mode_fix"]:
+            continue
+        ops.append({"path": path, "group": s["group"], "strategy": strategy,
+                    "action": "create" if local is None else "write" if data is not None else "chmod",
+                    "units": sorted(s["units"]), "restore": sorted(s["restore"]),
+                    "data": data, "mode": e.get("mode"), "exists": local is not None})
+    order = {g: i for i, g in enumerate(GROUP_ORDER)}
+    ops.sort(key=lambda o: (order.get(o["group"], 99), o["path"]))
+
+    # Next baseline: record upstream SHAs for written/converged/adopted units, drop obsolete ones.
+    units = dict(installed["units"])
+    for cls in RECORD_CLASSES:
+        for r in rows[cls]:
+            if r["strategy"] not in COMPARED_STRATEGIES or r["upstream"] is None:
+                continue
+            rec = {"strategy": r["strategy"], "sha256": r["upstream"]}
+            mode = entries.get(r["path"], {}).get("mode")
+            if mode:
+                rec["mode"] = mode
+            units[r["unit"]] = rec
+    for cls in RESTORE_CLASSES:
+        for r in rows[cls]:
+            if r["path"] in restore and r["upstream"] is not None:
+                rec = {"strategy": r["strategy"], "sha256": r["upstream"]}
+                mode = entries.get(r["path"], {}).get("mode")
+                if mode:
+                    rec["mode"] = mode
+                units[r["unit"]] = rec
+    for r in rows["obsolete"]:
+        units.pop(r["unit"], None)
+    new_installed = {
+        "baseline_version": BASELINE_VERSION,
+        "nexus_version": manifest.get("nexus_version") or installed["nexus_version"],
+        "installed_at": now_iso(),
+        "upstream": upstream.describe(),
+        "origin": "update",
+        "units": dict(sorted(units.items())),
+    }
+    return ops, new_installed
+
+
+# --------------------------------------------------------------------------
 # Commands
 # --------------------------------------------------------------------------
 
@@ -1185,10 +1507,106 @@ def cmd_plan(args) -> int:
         print(f"--- unchanged ({len(rows['unchanged'])}): identical everywhere (--verbose lists them)")
     print()
     if blocking:
-        print(f"{blocking} blocking row(s). `apply` (Phase 3) will still update the clean rows and leave these alone.")
+        print(f"{blocking} blocking row(s). `apply` will still update the clean rows and leave these alone.")
     else:
         print("No blocking rows. This was a plan; nothing has been written.")
     return 1 if blocking else 0
+
+
+def cmd_apply(args) -> int:
+    project_root = pathlib.Path(args.project_root).resolve()
+    rc = _guard_project(project_root)
+    if rc:
+        return rc
+    installed = load_installed(project_root)
+    project = WorkTree(project_root)
+    source, manifest, version = _open_target(args, installed)
+    have = installed["nexus_version"]
+    d = source.describe()
+    if parse_semver(version) < parse_semver(have) and not args.allow_downgrade:
+        print(f"ERROR: upstream {d['ref']} is Nexus {version}, older than the installed {have}; "
+              "pass --allow-downgrade to apply it anyway", file=sys.stderr)
+        return 1
+    if args.apply and live_session_recent(project_root) and not args.in_session:
+        print(f"ERROR: {STATE_FILE} changed in the last {LIVE_SESSION_SECONDS}s: a Claude Code session looks live, "
+              "and apply rewrites the hooks that govern it. Run apply from a plain terminal, or pass "
+              "--in-session and run /hooks immediately afterwards.", file=sys.stderr)
+        return 6
+
+    rows = three_way(project, installed, source, manifest)
+    restore = set(args.restore or [])
+    unknown = [p for p in restore if p not in {e["path"] for e in manifest["entries"]}]
+    if unknown:
+        print("ERROR: --restore path(s) not in the target manifest: " + ", ".join(unknown), file=sys.stderr)
+        return 1
+    ops, new_installed = compute_apply(project, installed, source, manifest, rows, restore)
+    blocking = sum(len(rows[c]) for c in BLOCKING_CLASSES)
+    hooks_touched = any(o["group"] == "hooks" for o in ops)
+    mode = "APPLY" if args.apply else "DRY-RUN"
+
+    print(f"=== Nexus apply: {have} → {version} ({d['url']} @ {d['ref']})  mode: {mode} ===")
+    print("  " + "  ".join(f"{c}={len(rows[c])}" for c in PLAN_CLASSES if rows[c]))
+    nothing_to_write = not ops and new_installed["units"] == installed["units"] and version == have
+    print()
+    verb = {"create": "created", "write": "written", "chmod": "chmod"} if args.apply else \
+           {"create": "WOULD CREATE", "write": "WOULD WRITE", "chmod": "WOULD CHMOD"}
+    for o in ops:
+        tag = "  [restore]" if o["restore"] else ""
+        detail = "" if o["strategy"] in ("replace", "create-if-absent") else f"  ({len(o['units'])} unit(s))"
+        print(f"  [{verb[o['action']]:12}] {o['group']:12} {o['path']}{detail}{tag}")
+    for cls in ("conflict", "unbaselined", "refused", "customized", "removed-locally", "obsolete"):
+        for r in rows[cls]:
+            if r["path"] in restore and cls in RESTORE_CLASSES:
+                continue
+            extra = f"  ({r['reason']})" if r.get("reason") else ""
+            print(f"  [{cls:12}] {r['unit']}{extra}  (left alone)")
+
+    if nothing_to_write:
+        print("\nNothing to write: every unit is either current or deliberately left alone.")
+        return 1 if blocking else 0
+    if not args.apply:
+        print(f"\nThis was a DRY-RUN: {len(ops)} file(s) would change. Re-run with --apply to write them.")
+        return 1 if blocking else 0
+
+    # Backups before the first write.
+    ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup_dir = pathlib.Path(args.backup_dir).resolve() if args.backup_dir \
+        else project_root / ".nexus" / "backups" / f"update-{version}-{ts}"
+    for o in ops:
+        if o["exists"]:
+            dst = backup_dir / o["path"]
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(project_root / o["path"], dst)
+    if (project_root / INSTALLED_FILE).is_file():
+        (backup_dir / INSTALLED_FILE).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(project_root / INSTALLED_FILE, backup_dir / INSTALLED_FILE)
+
+    # Writes, in group order; hooks last.
+    for o in ops:
+        target = project_root / o["path"]
+        if o["data"] is not None:
+            write_file_atomic(target, o["data"], o["mode"])
+        elif o["mode"]:
+            set_mode(target, o["mode"])
+    write_json_atomic(project_root / INSTALLED_FILE, new_installed)
+
+    print(f"\n  backup:    {backup_dir}")
+    print(f"  baseline:  {INSTALLED_FILE} rewritten ({len(new_installed['units'])} units, Nexus {new_installed['nexus_version']})")
+    problems = run_post_apply_validation(project_root)
+    if problems:
+        print("\nPOST-APPLY VALIDATION FAILED:", file=sys.stderr)
+        for p in problems:
+            print(f"  - {p}", file=sys.stderr)
+        print(f"Files are in place; restore from {backup_dir} or fix forward.", file=sys.stderr)
+        return 5
+    print("  validation: vault clean, validator selftest passed, hooks compile, settings.json sane")
+    if hooks_touched:
+        print("\nHooks were rewritten. In Claude Code, run:  /hooks")
+    if blocking:
+        print(f"\n{blocking} blocking row(s) were left alone (see above). Commit {INSTALLED_FILE} with the update.")
+        return 1
+    print(f"\nUpdate applied. Commit {INSTALLED_FILE} with the changed files.")
+    return 0
 
 
 # --------------------------------------------------------------------------
@@ -1436,7 +1854,7 @@ def selftest(real_root: pathlib.Path) -> int:
         _append(host / "knowledge/specs/spec--system--gamma.md", "\nsame change\n")
         _append(host / "knowledge/specs/spec--system--exit-gate.md", "\nhost only\n")               # → customized
         (host / "knowledge/specs/spec--system--delta.md").unlink()                                 # obsolete, also gone locally
-        (host / ".claude/hooks/nexus-exit-gate.py").unlink()                                       # → removed-locally
+        (host / "tools/nexus-decide.py").unlink()                                                  # → removed-locally
         _w(host, "knowledge/specs/spec--system--adopted.md", _FM_BINDING.format(t="spec", n="adopted"))
         _w(host, "knowledge/specs/spec--system--clash.md", "not the same\n")
         _append(host / "knowledge/index/index--system--project-navigation.md",
@@ -1458,7 +1876,7 @@ def selftest(real_root: pathlib.Path) -> int:
         check(by["adopt"] == ["knowledge/specs/spec--system--adopted.md"], f"T7 adopt: {by['adopt']}")
         check(by["unbaselined"] == ["knowledge/specs/spec--system--clash.md"], f"T7 unbaselined: {by['unbaselined']}")
         check(by["obsolete"] == ["knowledge/specs/spec--system--delta.md"], f"T7 obsolete: {by['obsolete']}")
-        check(by["removed-locally"] == [".claude/hooks/nexus-exit-gate.py"], f"T7 removed-locally: {by['removed-locally']}")
+        check(by["removed-locally"] == ["tools/nexus-decide.py"], f"T7 removed-locally: {by['removed-locally']}")
         check(by["mode-drift"] == [".claude/hooks/nexus-bootstrap.py"], f"T7 mode-drift: {by['mode-drift']}")
         check("knowledge/specs/spec--system--editor--media.md" not in str(by), "T7 project index line invisible")
         check(".claude/settings.json#Stop/nexus-exit-gate.py" in by["unchanged"], "T7 hook entry unchanged")
@@ -1499,9 +1917,14 @@ def selftest(real_root: pathlib.Path) -> int:
         import contextlib
         import io
 
+        last_output = [""]
+
         def quiet_main(argv: list[str]) -> int:
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                return main(argv)
+            out, err = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                rc = main(argv)
+            last_output[0] = out.getvalue() + err.getvalue()
+            return rc
 
         rc = quiet_main(["--project-root", str(host), "check", "--upstream", url])
         rec = read_update_check(host)
@@ -1511,6 +1934,87 @@ def selftest(real_root: pathlib.Path) -> int:
         rc = quiet_main(["--project-root", str(host), "check", "--upstream", (tmp / "nowhere-url").as_uri()])
         rec = read_update_check(host)
         check(rc == 3 and rec and rec["status"] == "unreachable", "T8 unreachable check recorded in the cache file")
+
+        # T9 — apply on the T7 host: writes the clean rows, leaves the rest, records the baseline.
+        _w(host, "knowledge/specs/spec--system--clash.md", _FM_BINDING.format(t="spec", n="clash") + "\nhost version\n")
+        backup = tmp / "backup"
+
+        def tree_hash(root: pathlib.Path) -> str:
+            h = hashlib.sha256()
+            for p in sorted(root.rglob("*")):
+                if p.is_file() and ".nexus" not in p.parts:
+                    h.update(p.relative_to(root).as_posix().encode())
+                    h.update(p.read_bytes())
+                    h.update(b"x" if p.stat().st_mode & stat.S_IXUSR else b"-")
+            return h.hexdigest()
+
+        rc = quiet_main(["--project-root", str(host), "apply", "--upstream", url])          # dry-run
+        check(rc == 1, "T9 dry-run exits 1 (blocking rows present)")
+        check((host / "knowledge/specs/spec--system--alpha.md").read_text().count("upstream change") == 0, "T9 dry-run wrote nothing")
+        rc = quiet_main(["--project-root", str(host), "apply", "--upstream", url, "--apply", "--backup-dir", str(backup)])
+        check(rc == 1, f"T9 apply exits 1 (conflict + unbaselined left alone); rc={rc}\n{last_output[0]}")
+        up11 = GitRef(template, "refs/tags/v1.1.0")
+        rd = lambda rel: (host / rel).read_bytes()  # noqa: E731
+        check(rd("knowledge/specs/spec--system--alpha.md") == up11.read("knowledge/specs/spec--system--alpha.md"), "T9 update written")
+        check(b"host change" in rd("knowledge/specs/spec--system--beta.md"), "T9 conflict untouched")
+        check(b"host only" in rd("knowledge/specs/spec--system--exit-gate.md"), "T9 customized untouched")
+        check(b"host version" in rd("knowledge/specs/spec--system--clash.md"), "T9 unbaselined untouched")
+        check((host / "knowledge/specs/spec--system--new.md").is_file(), "T9 add created")
+        check(not (host / "knowledge/specs/spec--system--delta.md").exists(), "T9 obsolete not resurrected")
+        check(not (host / "tools/nexus-decide.py").exists(), "T9 removed-locally stays removed")
+        check((host / ".claude/hooks/nexus-bootstrap.py").stat().st_mode & stat.S_IXUSR, "T9 mode-drift fixed")
+        cm_text = (host / "CLAUDE.md").read_text()
+        check("Protocol text, revised." in cm_text and "Project text that Nexus must never read." in cm_text,
+              f"T9 section replaced, project section kept:\n{cm_text}")
+        check("## Writing rules\n" in cm_text and "## Writing rules (if you modify the vault)" not in cm_text, "T9 renamed heading left alone")
+        idx_text = (host / "knowledge/index/index--system--project-navigation.md").read_text()
+        check("spec--system--alpha.md) — new owned line" in idx_text and "project line stays invisible" in idx_text
+              and idx_text.count("spec--system--exit-gate.md") == 1, "T9 index line inserted, project line kept")
+        gi = (host / ".gitignore").read_text()
+        check(".nexus/backups/" in gi and ".nexus/update-check.json" in gi and gi.count(".nexus/state*.json") == 1, "T9 ensure-lines appended once")
+        check((host / "knowledge/.obsidian/app.json").is_file(), "T9 create-if-absent recreated")
+        check((backup / "knowledge/specs/spec--system--alpha.md").is_file() and (backup / "CLAUDE.md").is_file()
+              and (backup / INSTALLED_FILE).is_file(), "T9 backups taken before writing")
+        inst = load_installed(host)
+        check(inst["nexus_version"] == "1.1.0" and inst["origin"] == "update", "T9 baseline version bumped")
+        check(inst["units"]["knowledge/specs/spec--system--alpha.md"]["sha256"] == sha256_bytes(up11.read("knowledge/specs/spec--system--alpha.md")), "T9 baseline records upstream sha for update")
+        check(inst["units"]["knowledge/specs/spec--system--beta.md"]["sha256"] == installed["units"]["knowledge/specs/spec--system--beta.md"]["sha256"], "T9 conflict keeps old baseline")
+        check("knowledge/specs/spec--system--adopted.md" in inst["units"] and "knowledge/specs/spec--system--clash.md" not in inst["units"], "T9 adopt recorded, unbaselined not")
+        check("knowledge/specs/spec--system--delta.md" not in inst["units"], "T9 obsolete dropped from baseline")
+        check("knowledge/specs/spec--system--gamma.md" in inst["units"]
+              and inst["units"]["knowledge/specs/spec--system--gamma.md"]["sha256"] == sha256_bytes(up11.read("knowledge/specs/spec--system--gamma.md")), "T9 converged recorded")
+
+        before = tree_hash(host)
+        rc = quiet_main(["--project-root", str(host), "apply", "--upstream", url, "--apply", "--backup-dir", str(tmp / "backup2")])
+        check(rc == 1 and tree_hash(host) == before, f"T9 second apply is a no-op (still reports the blocking rows); rc={rc}\n{last_output[0]}")
+        rows_after = three_way(WorkTree(host), load_installed(host), up11, m11)
+        check(not rows_after["update"] and not rows_after["add"] and not rows_after["mode-drift"], "T9 nothing left to write")
+
+        rc = quiet_main(["--project-root", str(host), "apply", "--upstream", url, "--apply",
+                         "--restore", "knowledge/specs/spec--system--beta.md", "--backup-dir", str(tmp / "backup3")])
+        check(rd("knowledge/specs/spec--system--beta.md") == up11.read("knowledge/specs/spec--system--beta.md"), "T9 --restore overwrote the conflict")
+        check(load_installed(host)["units"]["knowledge/specs/spec--system--beta.md"]["sha256"]
+              == sha256_bytes(up11.read("knowledge/specs/spec--system--beta.md")), "T9 --restore recorded")
+        check(b"host only" in rd("knowledge/specs/spec--system--exit-gate.md"), "T9 --restore is per path only")
+
+        # live-session guard
+        write_json_atomic(host / STATE_FILE, {"session_id": "x"})
+        rc = quiet_main(["--project-root", str(host), "apply", "--upstream", url, "--apply", "--backup-dir", str(tmp / "backup4")])
+        check(rc == 6, "T9 live session refused without --in-session")
+        (host / STATE_FILE).unlink()
+
+        # hooks-merge writer: upstream changes a nexus hook's timeout; a foreign hook survives.
+        s2 = json.loads(json.dumps(_SETTINGS))
+        s2["hooks"]["Stop"][0]["hooks"][0]["timeout"] = 30
+        s2["hooks"]["Stop"].append({"matcher": "", "hooks": [{"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/nexus-bootstrap.py"}]})
+        merged = json.loads(apply_hooks_merge(json.dumps(_SETTINGS).encode(), json.dumps(s2).encode(),
+                                              ["Stop/nexus-exit-gate.py", "Stop/nexus-bootstrap.py"]))
+        cmds = [h["command"] for g in merged["hooks"]["Stop"] for h in g["hooks"]]
+        check(any("project-hook.sh" in c for c in cmds), "T9 hooks-merge keeps the foreign hook")
+        exit_hook = next(h for g in merged["hooks"]["Stop"] for h in g["hooks"] if "nexus-exit-gate" in h["command"])
+        check(exit_hook["timeout"] == 30, "T9 hooks-merge takes the upstream entry")
+        check(any("nexus-bootstrap.py" in c for c in cmds), "T9 hooks-merge adds a new nexus hook")
+        check(units_hooks_merge(json.dumps(merged).encode()) == units_hooks_merge(json.dumps(s2).encode()), "T9 merged units equal upstream units")
     except UpdaterError as e:
         failures.append(f"unexpected UpdaterError during selftest: {e}")
     finally:
@@ -1574,6 +2078,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--allow-downgrade", action="store_true")
     p.add_argument("--verbose", action="store_true", help="also list unchanged units")
     p.add_argument("--json", dest="as_json", action="store_true")
+
+    a = sub.add_parser("apply", help="host side: adopt the target version (dry-run unless --apply)")
+    upstream_opts(a)
+    a.add_argument("--apply", action="store_true", help="actually write (default: dry-run)")
+    a.add_argument("--restore", action="append", metavar="PATH",
+                   help="overwrite this customized / conflicting / deleted path with upstream (repeatable)")
+    a.add_argument("--backup-dir", help="override .nexus/backups/update-<version>-<timestamp>")
+    a.add_argument("--allow-downgrade", action="store_true")
+    a.add_argument("--in-session", action="store_true",
+                   help="proceed although a Claude Code session looks live (then run /hooks)")
     return ap
 
 
@@ -1593,6 +2107,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_check(args)
         if args.command == "plan":
             return cmd_plan(args)
+        if args.command == "apply":
+            return cmd_apply(args)
         ap.print_help()
         return 0
     except UpdaterError as e:

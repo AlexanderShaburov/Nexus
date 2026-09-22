@@ -1,11 +1,11 @@
 ---
 type: spec
 scope: system
-status: review
+status: approved
 created: 2026-09-22
 updated: 2026-09-22
-source_of_truth: false
-knowledge_visibility: development
+source_of_truth: true
+knowledge_visibility: binding
 theme: nexus-self-update
 governs: [nexus.version, nexus.manifest.json, tools/nexus-update.py, .nexus/installed.json, .nexus/update-check.json, .nexus/unlock.txt]
 tags: [spec, self-update, manifest, baseline, three-way, cli]
@@ -19,7 +19,8 @@ tags: [spec, self-update, manifest, baseline, three-way, cli]
   - [Knowledge Vault Specification](spec--system--knowledge-vault.md) — `sessions/`, `business/` and `feedback/` are project directories and are never owned.
 - relates_to:
   - [Overall Structure (Nexus System)](../architecture/architecture--system--overall-structure.md) — §2d and §3 describe the files this spec governs.
-  - [Plan: Nexus self-update](../plans/plan--system--nexus-self-update.md) — design origin; this spec is promoted to binding when `apply` (Phase 3) lands.
+  - [Plan: Nexus self-update](../plans/plan--system--nexus-self-update.md) — design origin (development class).
+  - [Context Decision Gate Specification](spec--system--context-decision-gate.md) — the core freeze (§6) runs in the same PreToolUse hook, before the decision check.
   - [Lifecycle Gates Invariant](../invariants/invariant--system--lifecycle-gates.md) — updating the runtime rewrites the hooks that enforce the gates; hence "never automatic".
 
 ---
@@ -28,7 +29,7 @@ tags: [spec, self-update, manifest, baseline, three-way, cli]
 
 ## Purpose
 
-Define how a host project learns that a newer Nexus exists, sees what would change, and adopts it, without touching anything the project owns. This document is the behavioural contract for `tools/nexus-update.py`. It is in **review** until the `apply` subcommand exists; the subcommands marked *realized* are implemented and covered by `--selftest`, the ones marked *pending* are specified here so the realized ones are built toward them.
+Define how a host project learns that a newer Nexus exists, sees what would change, and adopts it, without touching anything the project owns. This document is the behavioural contract for `tools/nexus-update.py` and for the core freeze in `nexus-tool-gate.py`. Everything marked *realized* is implemented and covered by `--selftest`; the one part marked *pending* (the SessionStart notifier, §7) is specified so the realized parts are built toward it.
 
 ---
 
@@ -83,7 +84,7 @@ A `sections` heading found twice, an index link target found twice, a hook regis
 
 Rules:
 
-- Written only by `baseline` (*realized*) and, later, `apply`/`install` (*pending*). Atomic write (temp + rename).
+- Written only by `baseline` and `apply` (*realized*; a future `install` is the same engine). Atomic write (temp + rename).
 - **Committed** by the host. It is shared repository state, not session state.
 - `baseline` never modifies any other file. A unit whose local content differs from upstream is recorded with the **upstream** SHA and `customized_at_baseline`, so the first `plan` reports it as `customized`, never as a clean update. Units absent locally are not recorded.
 - `baseline --guess` scores every `v*` tag and the last 50 commits of `main` by identical units and picks the best; the scores are printed so the operator can confirm.
@@ -122,9 +123,9 @@ Plus `mode-drift` (a `replace` unit whose executable bit differs from the manife
 
 ---
 
-## 6. Core freeze in hosts (*pending*, Phase 3)
+## 6. Core freeze in hosts (*realized*)
 
-Every unit with strategy `replace` in `installed.json` is Nexus core. The tool gate denies `Edit`/`Write`/`MultiEdit`/`NotebookEdit` on a core path unless the path is listed in `.nexus/unlock.txt` (operator-written, one relative path per line). The freeze is inactive when `installed.json` is absent, so it never applies in the template. Bash writes are not caught; the three-way table remains the safety net.
+Every unit with strategy `replace` in `installed.json` is Nexus core. `nexus-tool-gate.py` denies `Edit`/`Write`/`MultiEdit`/`NotebookEdit` on a core path unless the path is listed in `.nexus/unlock.txt` (operator-written, one relative path per line, `#` comments allowed). The check runs after the bootstrap gate and **before** the Context Decision check, so a denied core edit never consumes the turn's decision. The denial names the file, the installed version, the feedback directory (`knowledge/feedback/`) as the intended route, and the unlock file as the escape hatch. The freeze is inactive when `installed.json` is absent, so it never applies in the template. Bash writes are not caught; `status` and `plan` remain the safety net. Recognition lives in `core_freeze_reason` in `_nexus_common.py`; `status` prints the unlock list.
 
 ---
 
@@ -136,9 +137,19 @@ The notifier hook will call the same logic with a 5 s budget, once per 24 h, and
 
 ---
 
-## 8. `apply` (*pending*, Phase 3)
+## 8. `apply` (*realized*)
 
-Dry-run by default; `--apply` mutates. Backups under `.nexus/backups/<version>-<timestamp>/` before the first write. Groups are written in the order `repo, runtime, vault-config, vault, instructions, tools, hooks`; every file via temp + rename; hooks last, followed by the instruction to run `/hooks`. Refuses when the session state file changed in the last 60 s unless `--in-session`. After writing: `installed.json` is rewritten with `origin: update`, then `validate-vault.py`, `validate-vault.py --selftest` and the static checks of the implementation report run; a failure is exit 5 with the backup path printed. Blocking rows are left alone and the run exits 1; everything else is applied. Re-running after success is a no-op.
+Dry-run by default; `--apply` mutates. It computes the §5 table, turns the `update` and `add` rows (plus `mode-drift`, and any `customized` / `conflict` / `removed-locally` row whose path was named with `--restore`) into one write per file, and:
+
+- refuses with exit 6 when `.nexus/state.json` changed in the last 60 s, unless `--in-session` (a Claude Code session looks live and `apply` rewrites the hooks that govern it);
+- refuses a downgrade unless `--allow-downgrade`;
+- copies every file it will modify, and the old `installed.json`, to `.nexus/backups/update-<version>-<timestamp>/` (or `--backup-dir`) before the first write;
+- writes in group order `repo, runtime, vault-config, vault, instructions, tools, hooks`, every file via temp + rename, executable bits from the manifest; the hooks group is last and the run ends with the instruction to run `/hooks` when it was touched;
+- per strategy: `replace` and `create-if-absent` write the upstream bytes; `sections` replaces each listed H2 section in place (a section new upstream is appended at EOF; a heading the host renamed is `removed-locally` and left alone); `index-entries` rewrites owned lines in place and inserts new ones after the last owned line of the same H2 section, else at the end of that section, else in a new section at EOF; `hooks-merge` removes the host's copy of each listed `nexus-*` entry and re-adds the upstream entry into the group with the same matcher (or a new group), keeping foreign entries and their order; `ensure-lines` appends missing lines once under a `# Nexus runtime` comment;
+- rewrites `installed.json` with `origin: update`: `update`, `add`, `converged`, `adopt` and restored units get the upstream SHA, `obsolete` units are dropped, `customized`, `conflict` and `removed-locally` units keep their old baseline;
+- then validates: `validate-vault.py` and its `--selftest`, every hook compiles, `settings.json` parses and registers only existing hooks. A failure is exit 5 with the files left in place and the backup path printed.
+
+Blocking rows are left alone and the run exits 1; everything else is applied. When nothing needs writing the run prints so, writes nothing (no backup, no baseline rewrite) and exits 0 or 1 by the blocking rows. Re-running after success is therefore a no-op.
 
 ---
 
@@ -158,4 +169,4 @@ Dry-run by default; `--apply` mutates. Backups under `.nexus/backups/<version>-<
 
 ## 10. Selftest
 
-`tools/nexus-update.py --selftest` MUST pass before a release is tagged. It builds a fixture template, proves every generation rule (T1), every extractor including refusal cases (T2), `manifest verify` (T3), `baseline` and `status` (T4), reading from a git ref (T5), every row of §5 against a fixture 1.1.0 release (T7), the cache clone, ref selection, `--guess`, `check` and `plan` through the CLI including the unreachable path (T8), and finally that the real template's manifest is in sync (T6).
+`tools/nexus-update.py --selftest` MUST pass before a release is tagged. It builds a fixture template, proves every generation rule (T1), every extractor including refusal cases (T2), `manifest verify` (T3), `baseline` and `status` (T4), reading from a git ref (T5), every row of §5 against a fixture 1.1.0 release (T7), the cache clone, ref selection, `--guess`, `check` and `plan` through the CLI including the unreachable path (T8), `apply` on that host: dry-run writes nothing, clean rows written, blocking and customized rows untouched, backups taken, baseline recorded per §8, second run a no-op, `--restore` per path, the live-session guard, and the `hooks-merge` writer (T9), and finally that the real template's manifest is in sync (T6). The core freeze is proven by piping PreToolUse JSON into the gate (implementation report, rows B15–B17).

@@ -44,6 +44,7 @@ These specs define how the vault itself and the agent lifecycle are enforced. Th
 - [Document Frontmatter](../specs/spec--system--document-frontmatter.md) — YAML contract for every doc
 - [Knowledge Visibility](../specs/spec--system--knowledge-visibility.md) — the three review-visibility classes (binding / development / historical) and the `knowledge_visibility` field
 - [Architecture Review](../specs/spec--system--architecture-review.md) — mandatory dual-analysis workflow (Binding State + Development State) and four-way gap classification
+- [Nexus Update](../specs/spec--system--nexus-update.md) — version identity, ownership manifest, install baseline, upstream cache, three-way table, `apply`, the core freeze in hosts, exit codes
 
 ---
 
@@ -80,11 +81,7 @@ Hooks live outside the vault under `.claude/hooks/` and operate against runtime 
 
 - `tools/validate-vault.py` — the vault rule set and its CLI. Holds the machine-checkable form of the frontmatter, naming and visibility contracts; `nexus-vault-validator.py` is a thin adapter over it. Run `python3 tools/validate-vault.py` before declaring a vault edit finished, `--selftest` after changing a rule.
 - `tools/nexus-decide.py` — the Context Decision claim: the tool-carried form of the per-turn decision (context-decision-gate spec, Form A). Validates and prints; decides nothing. Design origin: [Plan: Context Decision claim](../plans/plan--system--context-decision-claim.md) (development class).
-- `tools/nexus-update.py` — the updater: `manifest generate|verify` keeps `nexus.manifest.json` (the list of Nexus-owned paths) in sync with the tree; `baseline` records `.nexus/installed.json` in a host; `status` compares a host with its baseline; `check` asks upstream for a newer version; `plan` prints the three-way table; `--selftest` proves the rules. Architecture §2d. Contract: [Nexus Update](../specs/spec--system--nexus-update.md) (development class until `apply` lands). Design origin: [Plan: Nexus self-update](../plans/plan--system--nexus-self-update.md) (development class).
-
-## Specs in review (development class)
-
-- [Nexus Update](../specs/spec--system--nexus-update.md) — version identity, ownership manifest, baseline, upstream cache, three-way table, exit codes; promoted to binding when `apply` lands.
+- `tools/nexus-update.py` — the updater: `manifest generate|verify` keeps `nexus.manifest.json` (the list of Nexus-owned paths) in sync with the tree; `baseline` records `.nexus/installed.json` in a host; `status` compares a host with its baseline; `check` asks upstream for a newer version; `plan` prints the three-way table; `apply` adopts a version with backups and validation; `--selftest` proves the rules. Architecture §2d. Contract: [Nexus Update](../specs/spec--system--nexus-update.md). Design origin: [Plan: Nexus self-update](../plans/plan--system--nexus-self-update.md) (development class).
 
 ## Plans (development class)
 

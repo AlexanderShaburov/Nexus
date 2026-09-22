@@ -7,6 +7,10 @@
   current turn. Two forms are accepted, checked in this order: the per-turn
   flag already set; a claim (`python3 tools/nexus-decide.py ...`) read from
   tool_input; the "### Context Decision" text block read from the transcript.
+- Core freeze (hosts only): the editing tools are denied on a path that
+  .nexus/installed.json records as a Nexus core file, unless the path is
+  listed in .nexus/unlock.txt. Checked before the decision gate, so a denied
+  core edit never consumes the turn's decision. Inactive without a baseline.
 """
 
 import os
@@ -21,6 +25,7 @@ from _nexus_common import (  # noqa: E402
     REQUIRED_FILES,
     REQUIRED_INVARIANTS_DIR,
     bootstrap_complete,
+    core_freeze_reason,
     emit,
     emit_block,
     find_decision_gate,
@@ -84,6 +89,14 @@ def main() -> int:
         return 0
 
     # ---- bootstrap-completed branch -----------------------------------------------
+    # 0. Core freeze: a host never edits a Nexus core file in place
+    #    (spec--system--nexus-update.md §6). Bash writes are not caught here;
+    #    `nexus-update.py status` remains the safety net.
+    freeze = core_freeze_reason(tool, tool_input)
+    if freeze is not None:
+        emit_block(freeze, hook_event="PreToolUse")
+        return 0
+
     if tool in MUTATING_TOOLS:
         turn = state.setdefault("turn", {})
 

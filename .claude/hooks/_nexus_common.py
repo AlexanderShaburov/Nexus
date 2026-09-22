@@ -380,3 +380,64 @@ def find_bootstrap_confirmation(text: str) -> bool:
 def emit_and_exit(payload: dict[str, Any], code: int = 0) -> None:
     emit(payload)
     sys.exit(code)
+
+
+# ---------------------------------------------------------------------------
+# Core freeze (spec--system--nexus-update.md §6)
+#
+# In a host project every unit with strategy "replace" in .nexus/installed.json
+# is Nexus core. Hosts do not edit the core; the editing tools are denied on
+# such paths unless the path is listed in .nexus/unlock.txt. The freeze is
+# inactive when installed.json is absent, so it never applies in the template.
+# ---------------------------------------------------------------------------
+
+INSTALLED_FILE = ".nexus/installed.json"
+UNLOCK_FILE = ".nexus/unlock.txt"
+EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+FEEDBACK_DIR = "knowledge/feedback"
+
+
+def core_paths() -> tuple[set[str], str]:
+    """Return (frozen relative paths, installed nexus_version); empty set when no baseline."""
+    p = project_dir() / INSTALLED_FILE
+    if not p.is_file():
+        return set(), ""
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set(), ""
+    units = data.get("units") or {}
+    paths = {uid for uid, rec in units.items()
+             if isinstance(rec, dict) and rec.get("strategy") == "replace" and "#" not in uid}
+    return paths, str(data.get("nexus_version") or "")
+
+
+def unlocked_paths() -> set[str]:
+    p = project_dir() / UNLOCK_FILE
+    if not p.is_file():
+        return set()
+    try:
+        lines = p.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return set()
+    return {ln.strip() for ln in lines if ln.strip() and not ln.strip().startswith("#")}
+
+
+def core_freeze_reason(tool: str, tool_input: dict[str, Any]) -> str | None:
+    """Deny reason when `tool` would edit a frozen core path; None otherwise."""
+    if tool not in EDIT_TOOLS:
+        return None
+    file_path = tool_input.get("file_path") or tool_input.get("notebook_path") or ""
+    if not file_path:
+        return None
+    rel = relpath_from_project(file_path)
+    frozen, version = core_paths()
+    if rel not in frozen or rel in unlocked_paths():
+        return None
+    return (
+        f"NEXUS CORE FILE: {rel} is owned by Nexus {version or '(version unknown)'}. "
+        "Hosts do not edit the core. Record the change as a feedback note "
+        f"({FEEDBACK_DIR}/) so it reaches Nexus upstream and comes back with the next update; "
+        f"if it cannot wait, unlock the path by listing it in {UNLOCK_FILE} (operator decision) "
+        "and expect `python3 tools/nexus-update.py status` to report it as customized from then on."
+    )
