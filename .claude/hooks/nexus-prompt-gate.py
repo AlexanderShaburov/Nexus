@@ -25,13 +25,22 @@ from _nexus_common import (  # noqa: E402
 TURN_CONTRACT = """=== NEXUS TURN CONTRACT (per-turn) ===
 
 1) CONTEXT DECISION GATE — before any mutating tool (Edit/Write/MultiEdit/NotebookEdit/Bash/Task)
-   you MUST emit, as plain text in this turn:
+   you MUST state the Context Decision once in this turn, in one of two forms:
 
-   ### Context Decision
-   KB consult required: YES | NO
-   Reasoning: <why the KB is / is not needed; for NO, include what risks are accepted>
+   (a) claim — make this Bash call the FIRST mutating call of the turn (preferred; it is
+       read from the tool call itself and survives transcript narration):
 
-   PreToolUse BLOCKS mutating tools if this block is missing from the current turn.
+       python3 tools/nexus-decide.py --kb YES --reads <vault-doc> [<vault-doc> ...] --reason "<why>"
+       python3 tools/nexus-decide.py --kb NO --reason "<why the KB is not needed and what risk is accepted>"
+
+   (b) plain text earlier in this turn:
+
+       ### Context Decision
+       KB consult required: YES | NO
+       Reasoning: <why the KB is / is not needed; for NO, include what risks are accepted>
+
+   PreToolUse BLOCKS mutating tools if neither form is present in the current turn, and
+   BLOCKS a malformed claim with the reason. One decision per turn: later calls pass.
 
 2) EXIT GATE — every response MUST end with this Closure Block, exactly:
 

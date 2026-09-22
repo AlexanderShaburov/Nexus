@@ -79,6 +79,11 @@ Hooks live outside the vault under `.claude/hooks/` and operate against runtime 
 ## Runtime (tools)
 
 - `tools/validate-vault.py` — the vault rule set and its CLI. Holds the machine-checkable form of the frontmatter, naming and visibility contracts; `nexus-vault-validator.py` is a thin adapter over it. Run `python3 tools/validate-vault.py` before declaring a vault edit finished, `--selftest` after changing a rule.
+- `tools/nexus-decide.py` — the Context Decision claim: the tool-carried form of the per-turn decision (context-decision-gate spec, Form A). Validates and prints; decides nothing. Design origin: [Plan: Context Decision claim](../plans/plan--system--context-decision-claim.md) (development class).
+
+## Plans (development class)
+
+- [Context Decision claim via tool call](../plans/plan--system--context-decision-claim.md) — why the gate accepts a Bash claim alongside the text block; rollout order.
 
 ---
 

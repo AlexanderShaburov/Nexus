@@ -26,7 +26,7 @@ From that repository you will copy:
 
 👉 This repository is your **Nexus template**
 
-> **`tools/` is not optional.** `.claude/hooks/nexus-vault-validator.py` loads its rule set from `tools/validate-vault.py`. If `tools/` is missing the hook still registers and still runs — and silently does nothing, because it degrades quietly by design. You would have a validator that never validates and no sign of it.
+> **`tools/` is not optional.** `.claude/hooks/nexus-vault-validator.py` loads its rule set from `tools/validate-vault.py`. If `tools/` is missing the hook still registers and still runs — and silently does nothing, because it degrades quietly by design. You would have a validator that never validates and no sign of it. And `tools/nexus-decide.py` is the claim form of the Context Decision: without it the tool gate accepts only the text form, which some Claude Code builds never persist (see `docs/nexus-implementation-report.md` §4, "Transcript narration").
 >
 > **`docs/nexus-implementation-report.md` is referenced by `CLAUDE.md`** ("run the validation plan in ..."). Without it that pointer dangles in every new project.
 
@@ -81,6 +81,7 @@ Check that:
 - `.claude/hooks/` exists
 - `.claude/settings.json` exists
 - `tools/validate-vault.py` exists
+- `tools/nexus-decide.py` exists
 - `knowledge/` is NOT empty
 - `knowledge/sessions/` contains no leftover template transcripts
 - `CLAUDE.md` exists

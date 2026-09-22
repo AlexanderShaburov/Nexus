@@ -18,6 +18,7 @@ This document is the acceptance procedure for `.claude/hooks/`. Run it after **a
 | `nexus-vault-validator.py` | `PostToolUse` | Advisory frontmatter validation of the document just written | no (advisory only) |
 | `_nexus_common.py` | — | Shared state I/O, transcript parsing, regexes | — |
 | `tools/validate-vault.py` | — | Vault rule set + CLI; the validator hook is a thin adapter over it | — |
+| `tools/nexus-decide.py` | — | Context Decision **claim** (Form A): validates and prints the decision; the tool gate recognises the call from `tool_input.command` via the shared parser in `_nexus_common.py` | — |
 
 Contract sources of truth: `knowledge/specs/spec--system--session-bootstrap.md`, `spec--system--context-decision-gate.md`, `spec--system--exit-gate.md`. Structural description: `knowledge/architecture/architecture--system--overall-structure.md`.
 
@@ -116,6 +117,42 @@ Expected: `FAILURES: 0`.
 
 When you change a regex, **add the case that motivated the change to the list above** before declaring the fix good.
 
+### S7 — claim parser fixtures
+
+The claim form exists because Claude Code 2.1.278 (observed 2026-09-22 with Fable 5.1) persists mid-turn assistant text as a paraphrased `thinking` block, so the regex above never sees the block. The parser is the second gate surface; a false positive lets an arbitrary command through as a "decision".
+
+```bash
+python3 - <<'PY'
+import sys, os; os.environ.setdefault('CLAUDE_PROJECT_DIR', os.getcwd()); sys.path.insert(0, '.claude/hooks')
+from _nexus_common import parse_decision_claim
+SPEC = "knowledge/specs/spec--system--exit-gate.md"
+CASES = [  # (command, expected: claim | error | none)
+    (f'python3 tools/nexus-decide.py --kb YES --reads {SPEC} --reason "Changing the exit gate contract"', 'claim'),
+    ('cd /any/where && python3 tools/nexus-decide.py --kb no --reason "Hook-only edit, risk: missing a spec"', 'claim'),
+    ('./tools/nexus-decide.py --kb NO --reason "a; b && c are fine inside quotes"', 'claim'),
+    ('ls -la', 'none'),
+    ('python3 tools/nexus-decide.py --kb NO --reason "short"', 'error'),
+    ('python3 tools/nexus-decide.py --kb MAYBE --reason "long enough reason here"', 'error'),
+    ('python3 tools/nexus-decide.py --kb YES --reason "long enough reason here"', 'error'),          # YES needs --reads
+    ('python3 tools/nexus-decide.py --kb YES --reads knowledge/nope.md --reason "long enough reason"', 'error'),
+    ('python3 tools/nexus-decide.py --kb NO --reason "long enough reason here" && rm -rf x', 'error'),
+    ('python3 tools/nexus-decide.py --kb NO --reason "long enough reason here"; echo hi', 'error'),
+    ('python3 tools/nexus-decide.py --kb NO --reason "$(rm -rf x) long enough"', 'error'),
+    ('echo x && python3 tools/nexus-decide.py --kb NO --reason "long enough reason here"', 'error'),
+    ('python3 /tmp/nexus-decide.py --kb NO --reason "long enough reason here"', 'error'),
+    ('python3 tools/nexus-decide.py --kb NO --reason "long enough reason here" extra', 'error'),
+]
+fail = 0
+for cmd, want in CASES:
+    claim, err = parse_decision_claim(cmd)
+    got = 'claim' if claim else ('error' if err else 'none')
+    if got != want: print("FAIL", want, "->", got, "|", cmd, "|", err); fail += 1
+print("FAILURES:", fail)
+PY
+```
+
+Expected: `FAILURES: 0`. When the recognition rules change, mirror the change in `spec--system--context-decision-gate.md` §Decision Forms and add the motivating case here.
+
 ---
 
 ## 4. Behavioral checks (live session)
@@ -127,7 +164,10 @@ These cannot be scripted; they require a real Claude Code session. Perform them 
 | B1 | Start a fresh session; before reading anything, attempt `Bash(ls)` | Denied with `NEXUS BOOTSTRAP PENDING` |
 | B2 | Read the four Mandatory Startup files (incl. ≥1 invariant) | `.nexus/state.json` → `bootstrap.status: completed`, `read_ledger` has 3 entries, `invariant_read_count ≥ 1` |
 | B3 | Attempt `Bash(ls)` with no Context Decision in the turn | Denied with `NEXUS DECISION GATE MISSING` |
-| B4 | Emit a Context Decision block, then attempt `Bash(ls)` | Allowed; `state.json` → `turn.decision_gate_seen: true` |
+| B4 | Emit a Context Decision block, then attempt `Bash(ls)` | Allowed; `state.json` → `turn.decision_gate_seen: true`, `turn.decision.via: "text"`. If denied, see the narration note below before calling it a regression |
+| B4a | In a fresh turn, call `Bash(python3 tools/nexus-decide.py --kb NO --reason "<15+ chars>")` as the first mutating call | Allowed with `Context Decision claim accepted`; the block is printed to the terminal; `state.json` → `turn.decision.via: "claim"` |
+| B4b | In the same turn, `Edit` or `Write` a file | Allowed without a second claim |
+| B4c | In a fresh turn, call the claim with `--reason "x"` | Denied with `NEXUS DECISION CLAIM MALFORMED: --reason is too short` |
 | B5 | End a response with no Closure Block | Stop blocked with `NEXUS EXIT GATE VIOLATION: Closure Block missing or malformed` |
 | B6 | End with `code changed: yes` + `writeback evaluation performed: no` | Stop blocked with `Rule 1 violation` |
 | B7 | End with `KB changed: no` and no justification line | Stop blocked with `Rule 3 violation` |
@@ -192,6 +232,12 @@ PY
 
 If this prints `True` but the gate blocked, the block was a **false positive from the race**, not a format error. If it prints `False`, the agent really did emit a malformed block.
 
+### Transcript narration (why the claim form exists)
+
+Distinct from the race: in some Claude Code builds (2.1.278 with Fable 5.1, 2026-09-22) assistant text written in the same message as a tool call is persisted as a `thinking` block containing a one-sentence paraphrase, and no `text` block is written at all. Retrying does not help because the text never arrives. Symptom: B4 denied on every attempt while B9 passes, and the persisted record for the message is `thinking` + `tool_use` only. The claim form (B4a) is the remedy; the text form stays for environments that persist text normally.
+
+---
+
 ---
 
 ## 5. Sign-off checklist
@@ -199,8 +245,8 @@ If this prints `True` but the gate blocked, the block was a **false positive fro
 Do not claim the hooks work until all of these are true:
 
 - [ ] Section 2 static checks S1–S6 pass
-- [ ] Section 3 fixtures report `FAILURES: 0`
-- [ ] Section 4 rows B1–B14 observed (B9 assessed against the race note)
+- [ ] Section 3 fixtures report `FAILURES: 0`, including S7
+- [ ] Section 4 rows B1–B14 observed (B9 assessed against the race note, B4 against the narration note)
 - [ ] Any hook text that quotes a contract is mirrored in the corresponding spec under `knowledge/specs/`
 - [ ] `knowledge/architecture/architecture--system--overall-structure.md` still describes the actual set of registered hooks, with `updated:` bumped
 - [ ] `.nexus/state.json` is gitignored and no stray `.nexus/state*.json` is staged

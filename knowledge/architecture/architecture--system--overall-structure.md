@@ -51,7 +51,7 @@ Shell + Python scripts invoked by Claude Code at lifecycle events. They read and
 
 - `nexus-bootstrap.py` — runs on `SessionStart` and `PreCompact`. Resets state, injects the Mandatory Startup Reading Set.
 - `nexus-prompt-gate.py` — runs on `UserPromptSubmit`. Resets per-turn state and injects Decision Gate + Exit Gate reminders. Hard-blocks prompts while bootstrap is pending unless the prompt is a read-only KB query.
-- `nexus-tool-gate.py` — runs on `PreToolUse`. While bootstrap pending, only read-only tools (`Read`/`Glob`/`Grep`/`LS`/`NotebookRead`) are allowed, on any path — reads cannot mutate, so the gate constrains tool class, not location. Tracks read-ledger to auto-complete bootstrap. After bootstrap, non-read tools require a Decision Gate statement in the current turn.
+- `nexus-tool-gate.py` — runs on `PreToolUse`. While bootstrap pending, only read-only tools (`Read`/`Glob`/`Grep`/`LS`/`NotebookRead`) are allowed, on any path — reads cannot mutate, so the gate constrains tool class, not location. Tracks read-ledger to auto-complete bootstrap. After bootstrap, non-read tools require a Decision Gate statement in the current turn, accepted in two forms checked in order: the per-turn flag already set; a **claim** (`python3 tools/nexus-decide.py ...`) read from `tool_input.command`; the `### Context Decision` text block read from the transcript. A malformed claim is denied with the defect named.
 - `nexus-exit-gate.py` — runs on `Stop`. Parses transcript, validates Closure Block presence + field shape + dependency rules. Blocks completion with a `reason` on violation.
 
 ### 2a. Session Archival (`.claude/hooks/nexus-session-writer.py`)
@@ -75,6 +75,10 @@ The frontmatter contract is machine-checked rather than left to agent discipline
 - `.claude/hooks/nexus-vault-validator.py` is a thin `PostToolUse` adapter for `Edit`/`Write`/`MultiEdit`/`NotebookEdit`. It validates the single document just written, if it lives under `knowledge/`, and injects the findings as `additionalContext` so the problem surfaces while the edit is still in working context. Silent when the document is clean.
 
 The hook is **advisory and non-enforcing**. `PostToolUse` fires after the write, so it cannot prevent one; and neither layer ever edits a document — `spec--system--knowledge-visibility.md` rule 4 requires invalid combinations to be surfaced for judgement, not silently normalized.
+
+### 2c. Context Decision claim (`tools/nexus-decide.py`)
+
+The tool-carried form of the Context Decision (spec `spec--system--context-decision-gate.md`, Form A). The script validates its arguments with `parse_decision_claim_args` imported from `_nexus_common.py`, so the gate and the script share one parser, and prints the decision in the shape of the text block. It decides nothing and writes nothing. It exists because some Claude Code builds persist mid-turn assistant text as a paraphrased `thinking` block, which leaves the transcript-reading gate nothing to match; a tool call's parameters are persisted verbatim and reach the gate in `tool_input`. Stdlib only.
 
 ### 3. Runtime State (`.nexus/`)
 
@@ -107,7 +111,12 @@ PreToolUse
   └─> nexus-tool-gate.py
         ├─ if bootstrap pending: allow only read-only tools (any path)
         ├─ if bootstrap pending and Read hits a required file: record; upgrade if complete
-        └─ if bootstrap done and tool is mutating: require Decision Gate text in current turn
+        └─ if bootstrap done and tool is mutating:
+              ├─ turn.decision_gate_seen already true → allow
+              ├─ Bash matching tools/nexus-decide.py claim → record decision, allow
+              │    (malformed claim → deny with reason)
+              ├─ "### Context Decision" text in current turn → record decision, allow
+              └─ otherwise deny, showing both forms
 
 PostToolUse (Edit|Write|MultiEdit|NotebookEdit)
   └─> nexus-vault-validator.py   (non-enforcing, advisory)
@@ -145,10 +154,13 @@ Stop
   },
   "turn": {
     "index": 0,
-    "decision_gate_seen": false
+    "decision_gate_seen": false,
+    "decision": {"kb": "yes|no", "reason": "...", "reads": ["..."], "via": "claim"}
   }
 }
 ```
+
+`turn.decision` is present only after a decision was accepted in the turn; for the text form it is `{"kb": "...", "via": "text"}`.
 
 ### Closure Block grammar (enforced by nexus-exit-gate.py)
 
@@ -164,7 +176,16 @@ Dependency rules: if `code changed: yes` then `writeback evaluation performed: y
 
 ### Decision Gate grammar (enforced by nexus-tool-gate.py)
 
-Must appear in the current turn's assistant text before any mutating tool call:
+One of the two forms must precede any other mutating tool call in the turn.
+
+Form A, a claim, as the first mutating call of the turn (read from `tool_input.command`):
+
+```
+python3 tools/nexus-decide.py --kb YES --reads <vault-doc> [<vault-doc> ...] --reason "<why>"
+python3 tools/nexus-decide.py --kb NO --reason "<why the KB is not needed and what risk is accepted>"
+```
+
+Form B, a text block in the current turn's assistant text (read from the transcript; fallback):
 
 ```
 ### Context Decision

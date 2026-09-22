@@ -252,6 +252,123 @@ def find_decision_gate(text: str) -> str | None:
     return m.group(1).lower() if m else None
 
 
+# ---------------------------------------------------------------------------
+# Context Decision claim (tool-carried form of the decision)
+#
+# The text form above depends on the assistant's text being persisted to the
+# transcript verbatim. Some Claude Code builds persist mid-turn text as a
+# paraphrased "narration" thinking block instead, and the gate then denies a
+# compliant turn. Tool calls are persisted verbatim and arrive in tool_input,
+# so a Bash call of fixed form is accepted as the decision. One parser serves
+# both the gate (from the command line) and tools/nexus-decide.py (from argv).
+# Contract: knowledge/specs/spec--system--context-decision-gate.md
+# ---------------------------------------------------------------------------
+
+DECISION_CLAIM_SCRIPT = "tools/nexus-decide.py"
+DECISION_CLAIM_MIN_REASON = 15
+DECISION_CLAIM_USAGE = (
+    "python3 tools/nexus-decide.py --kb YES --reads <vault-doc> [<vault-doc> ...] --reason \"<why>\"\n"
+    "python3 tools/nexus-decide.py --kb NO --reason \"<why the KB is not needed and what risk is accepted>\""
+)
+_CLAIM_INTERPRETERS = {"python3", "python"}
+_CLAIM_OPTIONS = {"--kb", "--reason", "--reads"}
+_SHELL_PUNCTUATION = {";", "&", "&&", "|", "||", "<", ">", ">>", "<<", "(", ")"}
+
+
+def parse_decision_claim_args(argv: list[str]) -> tuple[dict[str, Any] | None, str | None]:
+    """Validate claim arguments (everything after the script path).
+
+    Returns (claim, None) when valid, (None, error) otherwise. `claim` is
+    {"kb": "yes"|"no", "reason": str, "reads": [project-relative paths], "via": "claim"}.
+    """
+    kb: str | None = None
+    reason: str | None = None
+    reads: list[str] = []
+    i = 0
+    while i < len(argv):
+        tok = argv[i]
+        if tok not in _CLAIM_OPTIONS:
+            return None, f"unexpected argument {tok!r}; only --kb, --reason, --reads are accepted"
+        if tok == "--reads":
+            i += 1
+            while i < len(argv) and not argv[i].startswith("--"):
+                reads.append(argv[i])
+                i += 1
+            continue
+        if i + 1 >= len(argv) or argv[i + 1].startswith("--"):
+            return None, f"{tok} requires a value"
+        if tok == "--kb":
+            kb = argv[i + 1]
+        else:
+            reason = argv[i + 1]
+        i += 2
+
+    if kb is None:
+        return None, "--kb YES|NO is required"
+    kb_norm = kb.strip().lower()
+    if kb_norm not in ("yes", "no"):
+        return None, f"--kb must be YES or NO, got {kb!r}"
+    if reason is None or not reason.strip():
+        return None, "--reason is required and must not be empty"
+    reason = " ".join(reason.split())
+    if len(reason) < DECISION_CLAIM_MIN_REASON:
+        return None, (
+            f"--reason is too short ({len(reason)} chars, minimum {DECISION_CLAIM_MIN_REASON}); "
+            "state why the KB is or is not needed, and for NO what risk is accepted"
+        )
+    if kb_norm == "yes" and not reads:
+        return None, "--kb YES requires --reads with at least one vault document to read"
+    rel_reads: list[str] = []
+    root = project_dir()
+    for p in reads:
+        rel = relpath_from_project(p)
+        if not rel or not (root / rel).is_file():
+            return None, f"--reads path {p!r} is not an existing file under the project"
+        rel_reads.append(rel)
+    return {"kb": kb_norm, "reason": reason, "reads": rel_reads, "via": "claim"}, None
+
+
+def parse_decision_claim(command: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Recognise a Context Decision claim in a Bash command line.
+
+    Returns (claim, None) for a well-formed claim, (None, error) when the
+    command invokes the claim script but is malformed, and (None, None) when
+    the command is not a claim at all.
+    """
+    import shlex
+
+    if not command or "nexus-decide.py" not in command:
+        return None, None
+    if "\n" in command:
+        return None, "a claim must be a single line"
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        tokens = list(lexer)
+    except ValueError as exc:
+        return None, f"cannot parse command: {exc}"
+
+    # Tolerate a leading `cd <dir> &&`: the Bash tool resets its cwd between calls.
+    if len(tokens) >= 4 and tokens[0] == "cd" and tokens[2] == "&&":
+        tokens = tokens[3:]
+
+    idx = next((i for i, t in enumerate(tokens) if pathlib.PurePosixPath(t).name == "nexus-decide.py"), None)
+    if idx is None:
+        return None, "nexus-decide.py must be invoked directly"
+    if not (idx == 0 or (idx == 1 and tokens[0] in _CLAIM_INTERPRETERS)):
+        return None, "a claim must be a single command: [python3] tools/nexus-decide.py ..."
+    if relpath_from_project(tokens[idx]) != DECISION_CLAIM_SCRIPT:
+        return None, f"claim script must be {DECISION_CLAIM_SCRIPT} inside the project"
+
+    args = tokens[idx + 1 :]
+    for tok in args:
+        if tok in _SHELL_PUNCTUATION:
+            return None, f"shell operator {tok!r} is not allowed in a claim"
+        if "$(" in tok or "`" in tok:
+            return None, "command substitution is not allowed in a claim"
+    return parse_decision_claim_args(args)
+
+
 def find_closure_block(text: str):
     return CLOSURE_BLOCK_RE.search(text or "")
 
