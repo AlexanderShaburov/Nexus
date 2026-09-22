@@ -18,6 +18,7 @@ tags: [plan, self-update, upgrade, manifest, baseline, three-way-merge, hooks]
   - [Document Frontmatter Specification](../specs/spec--system--document-frontmatter.md) — `scope: system` is the primary ownership signal for vault documents.
   - [Knowledge Visibility Specification](../specs/spec--system--knowledge-visibility.md) — this plan is a development-class document and must not be read as binding.
 - relates_to:
+  - [Plan: Nexus feedback channel](plan--system--nexus-feedback-channel.md) — the return path for improvements that hosts may no longer make in place once the core is frozen (§7.2a); shares the cache directory and the CLI.
   - [Plan: Context Decision claim via tool call](plan--system--context-decision-claim.md) — the previous change to the runtime; its rollout order (hooks last, test by piping JSON) is reused here.
   - [Runbook: Development Visibility Migration](../runbooks/runbook--system--development-visibility-migration.md) — the hand-written migration the patch bundle mechanism was built for; the updater generalizes that bundle.
 
@@ -95,8 +96,9 @@ Neither file is delivered to hosts. A host records what it has in `.nexus/instal
     {"path": "knowledge/.obsidian/app.json",        "strategy": "create-if-absent", "group": "vault-config"}
   ],
   "never_touch": [".nexus/state*.json", ".nexus/session-theme.txt", ".nexus/session-file.txt",
-                  ".nexus/installed.json", ".nexus/update-check.json", ".claude/settings.local.json",
-                  "knowledge/sessions/**", "knowledge/business/**"]
+                  ".nexus/installed.json", ".nexus/update-check.json", ".nexus/unlock.txt",
+                  ".claude/settings.local.json",
+                  "knowledge/sessions/**", "knowledge/business/**", "knowledge/feedback/**"]
 }
 ```
 
@@ -221,6 +223,25 @@ Comparison is byte-exact after one normalization only: trailing whitespace on ea
 - **The updater updating itself**: `tools/nexus-update.py` is a `replace` unit in group `tools`. The running interpreter has already loaded the module, so replacing the file mid-run is safe on POSIX; the tools group is applied before hooks so a re-run for a second phase already uses the new code.
 - **Hooks under a live session** (brief §3.5): `apply` writes group `hooks` last, each file via temp + `os.replace` so no hook is ever half-written on disk, and ends with the instruction to run `/hooks`. It also refuses with exit 6 when `.nexus/state.json` was modified in the last 60 s and `--in-session` was not passed, which catches the case where the agent runs `apply` inside the session it would rewrite. The operator's intended path is a plain terminal.
 
+### 7.2a Core freeze in hosts (operator decision, 2026-09-22)
+
+The `conflict` row exists because a host may edit an owned unit. The operator's direction is that hosts **must not** edit the Nexus core at all: they build around it (project knowledge, project sections of `CLAUDE.md`, project entries in the index, project hooks in `settings.json`) but never inside it. Improvements to Nexus travel through the feedback channel (`plan--system--nexus-feedback-channel.md`) and come back as an update.
+
+Mechanism, all inside existing components:
+
+- **Core** = every unit with strategy `replace` in `.nexus/installed.json`. No second list: the baseline is the freeze list. In the template repository itself there is no `installed.json`, so the freeze never applies upstream, which is where the core is edited.
+- **`nexus-tool-gate.py`** gains one rule after the bootstrap and decision checks: for `Edit`, `Write`, `MultiEdit`, `NotebookEdit`, if `tool_input.file_path` resolves to a core path and the path is not unlocked, deny with:
+
+  `NEXUS CORE FILE: <path> is owned by Nexus <version>. Hosts do not edit the core. Record the change as a feedback note (knowledge/feedback/) or, if it cannot wait, unlock the path in .nexus/unlock.txt.`
+
+  The rule reads `installed.json` once per call; absent file → rule inactive.
+- **`.nexus/unlock.txt`**: one relative path per line, written by the operator only, never by a hook or by `apply`; listed in `never_touch`. An unlocked path is editable and is thereafter `customized` in the three-way table, so `apply` reports it and leaves it alone. `status` prints the unlock list so it cannot be forgotten.
+- **Limits stated plainly.** The gate sees a path only on the editing tools; a write through Bash (`sed`, heredoc, `git checkout`) is not caught. The three-way comparison stays as the safety net: `status` reports `customized`, `plan` reports `customized` or `conflict`, and neither overwrites. The freeze turns conflicts from a workflow into a rare, visible exception.
+- **Consequence for Q3 (§12):** conflict handling is report-only, host version kept, exit 1. The `--conflict-copies` flag is dropped from the CLI surface; if hand merging is ever needed, `plan --diff <path>` prints the upstream diff.
+- **One-time untangling of already-diverged hosts** (Liquid_Nexus): the retrofit (§9) lists every core unit that differs. For each, exactly one of: port the change into the template and receive it back via `apply`; or reset it with `apply --restore <path>`. The freeze is switched on by the baseline write itself, so it takes effect the moment `installed.json` exists.
+
+Spec mirror: this rule extends the tool-gate contract in `spec--system--context-decision-gate.md`, or rather warrants its own short section in the new `spec--system--nexus-update.md` (§10), and the architecture doc's PreToolUse control flow gains one branch. `CLAUDE.md` gate 2 text mentions the freeze in one sentence.
+
 ### 7.3 Partial application
 
 As in `apply.py`: a unit is refused (ambiguous heading, duplicate key, unparsable JSON) individually; the rest of the plan still applies. Nothing is written until the whole plan has been computed, and the backup of every touched file is taken before the first write.
@@ -240,7 +261,7 @@ Stdlib only; shares the frontmatter parser with `tools/validate-vault.py` by imp
 | `status` | no | nothing | installed version, upstream ref, per-unit local state against the baseline (`unchanged` / `customized` / `removed-locally` / `mode-drift`), never-touch boundary |
 | `check` | yes (ls-remote only) | `.nexus/update-check.json` | "is there a newer version"; same logic as the hook, verbose |
 | `plan [--ref R]` | yes (fetch into cache) | nothing in the project | the full three-way table (§7.1), grouped, with a summary count per class; `--json` for tooling |
-| `apply [--ref R] --apply` | yes | project files, backup, `installed.json` | dry-run without `--apply`, exactly like `apply.py`; `--backup-dir`, `--restore`, `--allow-downgrade`, `--in-session`, `--conflict-copies` |
+| `apply [--ref R] --apply` | yes | project files, backup, `installed.json` | dry-run without `--apply`, exactly like `apply.py`; `--backup-dir`, `--restore <path>`, `--allow-downgrade`, `--in-session`; `plan --diff <path>` shows the upstream diff of one unit for hand merging |
 | `baseline --version V [--ref R] [--guess]` | yes | `.nexus/installed.json` only | retrofit for projects installed before baselines existed (§9) |
 | `manifest generate\|verify` | no | `nexus.manifest.json` (generate only) | template side; `verify` is part of `--selftest` |
 | `--selftest` | no | temp dirs only | fixtures for every row of §7.1, every strategy, the notifier's silent paths, and `manifest verify` |
@@ -289,7 +310,7 @@ Phase boundaries are pause points per `spec--system--knowledge-driven-task-orche
 | 0 | this proposal | `knowledge/plans/plan--system--nexus-self-update.md` | operator review; answers to §12 |
 | 1 | version + manifest + baseline | `nexus.version` (`1.0.0`), `nexus.manifest.json`, `tools/nexus-update.py` with `manifest`, `baseline`, `status` and `--selftest`; tag `v1.0.0` on `main` after pushing `28ab085`; installation guide Step 4c; `.gitignore` line | `manifest verify` clean; `baseline` on a copy of the template yields 100 % identical units; selftest fixtures for §3.4 rules |
 | 2 | `check` and `plan` | cache clone, ref selection, three-way engine, all strategies in read mode | every row of §7.1 has a fixture; `plan` on a copy of the template against `v1.0.0` is all `unchanged`; against a synthetic newer ref shows the expected classes |
-| 3 | `apply` | backups, temp+rename writes, group order, post-apply validation, `--restore`, conflict handling | idempotency: a second `apply --apply` is a no-op with exit 0; a customized unit survives an upstream change; the S1–S5 checks pass after apply |
+| 3 | `apply` + core freeze | backups, temp+rename writes, group order, post-apply validation, `--restore`, report-only conflicts; the core-freeze rule in `nexus-tool-gate.py`, `.nexus/unlock.txt`, spec and architecture mirror (§7.2a) | idempotency: a second `apply --apply` is a no-op with exit 0; a customized unit survives an upstream change; the S1–S5 checks pass after apply; piping JSON into the gate: Edit on a core path denied, on an unlocked path allowed, on a project path allowed, with no `installed.json` allowed |
 | 4 | notifier | `.claude/hooks/nexus-update-check.py`, registration in `.claude/settings.json`, entry in the architecture doc §2d and the implementation report | piping JSON into the hook: silent without baseline, silent when cached, silent when `git` fails (simulated with a bogus URL), one line when newer; runtime under 6 s with the network cut |
 | 5 | retrofit | rehearsal on a template copy, then Liquid_Nexus, then others; runbook `runbook--system--nexus-update-retrofit.md` | each host has a committed `installed.json` and a clean `plan` |
 
@@ -318,14 +339,15 @@ Brief §9, plus what the repository added. Decisions recorded on 2026-09-22 are 
 
 1. **Remote and credentials.** `origin` is the private GitHub repository and is reachable from this environment without a prompt. Open: is the same true from the machines where Liquid_Nexus and the other hosts live?
 2. **Track tags or `main`?** **Decided: tags (`v*`)**, `--ref main` for testing; `v1.0.0` is created in Phase 1 after `28ab085` is pushed.
-3. **Conflicts** (the `conflict` row of §7.1: the host edited an owned unit *and* upstream changed the same unit, so neither side can be taken automatically). Proposed default: report only, the host's version stays, exit 1. `--conflict-copies` additionally writes the upstream version next to the file as `<path>.nexus-upstream` for hand merging. Neither option overwrites the host's file. Open: explained to the operator, awaiting confirmation.
+3. **Conflicts.** **Decided: hosts do not edit the core at all** (§7.2a: the tool gate denies edits to `replace` units, `.nexus/unlock.txt` is the operator's escape hatch). A conflict is therefore an exception; it is reported, the host's version stays, exit 1. No `.nexus-upstream` copies; `plan --diff` serves hand merging.
 4. **`patches/`.** Proposed: keep the bundle format for migrations that need operator prompts; the updater does not read or replace bundles. Open.
 5. **Which hosts** besides Liquid_Nexus. **Decided: two or three more exist; none is in scope until the mechanism works.** Phase 5 targets Liquid_Nexus only; the others follow the same runbook later.
-6. **JSON manifest** instead of YAML (D4). Open: explained to the operator (stdlib `json` versus no YAML parser), awaiting confirmation.
-7. **Section ownership of `CLAUDE.md` by H2 heading** (§3.3). Open: explained to the operator (Nexus owns the six listed sections; every other section is the host's and is never read), awaiting confirmation.
+6. **JSON manifest** instead of YAML (D4). **Decided: JSON** (explained 2026-09-22: stdlib `json` versus no YAML parser; operator agreed with the plan as explained).
+7. **Section ownership of `CLAUDE.md` by H2 heading** (§3.3). **Decided: yes** (explained 2026-09-22: Nexus owns the six listed sections; every other section is the host's and is never read).
 8. **Historical system documents.** **Decided: excluded from the manifest.** Documents that do not take part in running the system are template history and are not carried to hosts (§3.4 rule 2).
 9. **Live-session guard** (§7.2, last item): refuse `apply` when `state.json` changed in the last 60 s unless `--in-session`. Open.
 10. **Installer.** **Decided as a design requirement, not as scope:** a one-command install run inside the target folder is wanted later; the engine must serve it (§10a).
+11. **Feedback from hosts to Nexus.** **Decided: separate plan**, `plan--system--nexus-feedback-channel.md`; the updater only lends it the cache directory and the `feedback push` subcommand.
 
 ---
 

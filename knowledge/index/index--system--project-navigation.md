@@ -84,7 +84,8 @@ Hooks live outside the vault under `.claude/hooks/` and operate against runtime 
 ## Plans (development class)
 
 - [Context Decision claim via tool call](../plans/plan--system--context-decision-claim.md) — why the gate accepts a Bash claim alongside the text block; rollout order.
-- [Nexus self-update](../plans/plan--system--nexus-self-update.md) — Phase 0 proposal: ownership manifest, three-way comparison, upstream fetch, SessionStart notifier, CLI, retrofit path. Status: proposed.
+- [Nexus self-update](../plans/plan--system--nexus-self-update.md) — Phase 0 proposal: ownership manifest, three-way comparison, upstream fetch, SessionStart notifier, CLI, retrofit path, core freeze in hosts. Status: proposed.
+- [Nexus feedback channel](../plans/plan--system--nexus-feedback-channel.md) — how hosts send observations about Nexus upstream without push rights: `feedback` notes in the host vault, local mailbox in the updater cache, deferred GitHub-issue transport. Status: proposed.
 
 ---
 
