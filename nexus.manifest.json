@@ -1,8 +1,8 @@
 {
   "manifest_version": 1,
   "nexus_version": "1.0.0",
-  "generated_from": "60b57a611b83f6b71c8b469eeb6dc0be6c0ad011",
-  "generated_at": "2026-09-22T14:15:00",
+  "generated_from": "06661313a9977f2241a7e93e2905cba204bfbbbc",
+  "generated_at": "2026-09-22T14:24:38",
   "entries": [
     {
       "path": ".claude/hooks/_nexus_common.py",
@@ -36,6 +36,12 @@
     },
     {
       "path": ".claude/hooks/nexus-tool-gate.py",
+      "strategy": "replace",
+      "group": "hooks",
+      "mode": "755"
+    },
+    {
+      "path": ".claude/hooks/nexus-update-check.py",
       "strategy": "replace",
       "group": "hooks",
       "mode": "755"

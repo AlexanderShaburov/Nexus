@@ -7,7 +7,7 @@ updated: 2026-09-22
 source_of_truth: true
 knowledge_visibility: binding
 theme: nexus-self-update
-governs: [nexus.version, nexus.manifest.json, tools/nexus-update.py, .nexus/installed.json, .nexus/update-check.json, .nexus/unlock.txt]
+governs: [nexus.version, nexus.manifest.json, tools/nexus-update.py, .claude/hooks/nexus-update-check.py, .nexus/installed.json, .nexus/update-check.json, .nexus/unlock.txt]
 tags: [spec, self-update, manifest, baseline, three-way, cli]
 ---
 
@@ -29,7 +29,7 @@ tags: [spec, self-update, manifest, baseline, three-way, cli]
 
 ## Purpose
 
-Define how a host project learns that a newer Nexus exists, sees what would change, and adopts it, without touching anything the project owns. This document is the behavioural contract for `tools/nexus-update.py` and for the core freeze in `nexus-tool-gate.py`. Everything marked *realized* is implemented and covered by `--selftest`; the one part marked *pending* (the SessionStart notifier, §7) is specified so the realized parts are built toward it.
+Define how a host project learns that a newer Nexus exists, sees what would change, and adopts it, without touching anything the project owns. This document is the behavioural contract for `tools/nexus-update.py`, for the core freeze in `nexus-tool-gate.py` and for the notifier `nexus-update-check.py`. Every section is realized; `--selftest` and the implementation report's piped-JSON rows prove it.
 
 ---
 
@@ -129,11 +129,18 @@ Every unit with strategy `replace` in `installed.json` is Nexus core. `nexus-too
 
 ---
 
-## 7. `check` (*realized*) and the SessionStart notifier (*pending*, Phase 4)
+## 7. `check` and the SessionStart notifier (*realized*)
 
-`check` resolves the target ref, reads its version, writes `.nexus/update-check.json` (`checked_at`, `status` ok|unreachable, `upstream_version`, `upstream_ref`, `upstream_commit`, `error`) and prints one of: newer available, up to date, or older. It always records the attempt, including failures, so the notifier can throttle on it. Exit 0 on a completed comparison, 3 when upstream is unreachable.
+`check` resolves the target ref, reads its version, writes `.nexus/update-check.json` (`checked_at`, `status` ok|unreachable|no-tags, `upstream_version`, `upstream_ref`, `upstream_commit`, `error`, `via` cli|hook) and prints one of: newer available, up to date, or older. It always records the attempt, including failures, so the notifier can throttle on it. Exit 0 on a completed comparison, 3 when upstream is unreachable.
 
-The notifier hook will call the same logic with a 5 s budget, once per 24 h, and emit at most one line of context; it never blocks a session and never fetches objects.
+`.claude/hooks/nexus-update-check.py` is a **non-enforcing** hook registered on `SessionStart` only (not `PreCompact`), after `nexus-bootstrap.py`. Its whole contract:
+
+1. No `.nexus/installed.json`, or one without a version or upstream URL → exit 0, no output. The freeze and the notifier both switch on with the baseline, so the template never sees either.
+2. `.nexus/update-check.json` younger than 24 h → reused; no network.
+3. Otherwise exactly one network call, `git ls-remote --tags <upstream url>`, with a 5 s timeout and `GIT_TERMINAL_PROMPT=0`: no fetch, no clone, no credential prompt. The highest `v*` tag gives the version; the record is written with `status` `ok`, `no-tags` or `unreachable` and `via: hook`. A failure therefore keeps the next 24 h quiet.
+4. Output only when the recorded upstream version is **newer** than the installed one, and then exactly one line of `additionalContext`: `Nexus <new> is available upstream (<tag>); this project has <old>. Run python3 tools/nexus-update.py plan to see what would change. Nothing has been applied.`
+
+It exits 0 on every path, swallows its own exceptions, and writes nothing but the record. `status` prints the record. Proven by piping JSON (implementation report B18–B20): silent without a baseline, when up to date, when throttled, when unreachable, when upstream has no tags and when the baseline is corrupt; one line when a `v9.9.9` tag exists upstream; template unaffected.
 
 ---
 

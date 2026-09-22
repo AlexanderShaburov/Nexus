@@ -76,6 +76,7 @@ Hooks live outside the vault under `.claude/hooks/` and operate against runtime 
 
 - `nexus-session-writer.py` — Stop; archives the transcript to `sessions/` (architecture §2a)
 - `nexus-vault-validator.py` — PostToolUse; advisory frontmatter validation of a document just written (architecture §2b)
+- `nexus-update-check.py` — SessionStart; in a host with a baseline, one throttled `ls-remote` and one line of context when a newer Nexus tag exists (architecture §2e, spec [Nexus Update](../specs/spec--system--nexus-update.md) §7)
 
 ## Runtime (tools)
 

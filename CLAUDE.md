@@ -30,11 +30,13 @@ The enforcement layer is:
 - `.claude/hooks/nexus-exit-gate.py`
 - `.claude/hooks/_nexus_common.py` (shared helpers)
 
-Alongside them, two **non-enforcing** hooks run:
+Alongside them, three **non-enforcing** hooks run:
 
 - `.claude/hooks/nexus-session-writer.py` — archives the session transcript to `knowledge/sessions/session--<theme>--<YYYY-MM-DD>--<session-id8>.md`. It strips tool calls, tool results, thinking blocks and system-reminder tags, keeping only user prompts and assistant text. It rewrites the same file in place on every `Stop`, renaming it when `.nexus/session-theme.txt` changes **within the same session**, so a session stays one document. The ownership marker `.nexus/session-file.txt` is session-scoped JSON — a different session never renames or overwrites an existing archive. Written docs carry `status: draft`, `source_of_truth: false`, `knowledge_visibility: historical` — they are an audit trail, never a source of truth. The hook is silent by design (no stdout, swallows its own exceptions) so it cannot interfere with the Exit Gate scheduled in the same event. It gates nothing and blocks nothing, and it has no spec by design: it enforces no contract, so there is no contract to mirror.
 
 - `.claude/hooks/nexus-vault-validator.py` (`PostToolUse` on `Edit`/`Write`/`MultiEdit`/`NotebookEdit`) — after a write to a document under `knowledge/`, validates that one document against the frontmatter contract and reports findings as advisory context. Silent when clean. It never blocks (the write has already happened) and never auto-corrects. The rules live in `tools/validate-vault.py`, which is also the CLI: run `python3 tools/validate-vault.py` for the whole vault, `--selftest` to prove every rule still fires.
+
+- `.claude/hooks/nexus-update-check.py` (`SessionStart` only) — in a project with a `.nexus/installed.json` baseline, asks the Nexus repository at most once a day, with one `git ls-remote` bounded to 5 s, whether a newer `v*` tag exists, and says so in one line if it does. Silent otherwise, silent on every failure, silent in this template. It never applies anything: updating is `python3 tools/nexus-update.py plan` then `apply --apply`, run by the operator from a plain terminal. Contract: `knowledge/specs/spec--system--nexus-update.md` §7.
 
 Hook config: `.claude/settings.json`. Runtime state: `.nexus/state.json` (gitignored), plus the session-writer's markers `.nexus/session-theme.txt` and `.nexus/session-file.txt`.
 

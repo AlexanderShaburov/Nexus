@@ -16,6 +16,7 @@ This document is the acceptance procedure for `.claude/hooks/`. Run it after **a
 | `nexus-exit-gate.py` | `Stop` | Closure Block validation | **yes** (`decision: block`) |
 | `nexus-session-writer.py` | `Stop` | Transcript archival to `knowledge/sessions/` | no (silent by design) |
 | `nexus-vault-validator.py` | `PostToolUse` | Advisory frontmatter validation of the document just written | no (advisory only) |
+| `nexus-update-check.py` | `SessionStart` | In a host with a baseline: throttled `ls-remote`, one line when a newer Nexus tag exists | no (silent by design) |
 | `_nexus_common.py` | — | Shared state I/O, transcript parsing, regexes | — |
 | `tools/validate-vault.py` | — | Vault rule set + CLI; the validator hook is a thin adapter over it | — |
 | `tools/nexus-decide.py` | — | Context Decision **claim** (Form A): validates and prints the decision; the tool gate recognises the call from `tool_input.command` via the shared parser in `_nexus_common.py` | — |
@@ -53,8 +54,9 @@ for event, groups in cfg['hooks'].items():
 print("MISSING:", missing or "none")
 PY
 
-# S4 — no hook writes to stdout unless it intends to (session-writer must stay silent)
+# S4 — no hook writes to stdout unless it intends to (session-writer and update-check must stay silent)
 echo '{}' | .claude/hooks/nexus-session-writer.py | wc -c   # expect 0
+echo '{}' | .claude/hooks/nexus-update-check.py | wc -c     # expect 0 (template: no installed.json)
 
 # S5 — the vault rule set still catches everything it claims to
 python3 tools/validate-vault.py --selftest
@@ -67,7 +69,7 @@ python3 tools/nexus-update.py manifest verify
 python3 tools/nexus-update.py --selftest
 ```
 
-Expected: S1 all `OK`; S2 no output; S3 `MISSING: none` and six registrations (`SessionStart`, `PreCompact`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`×2); S4 prints `0`; S5 all fixtures pass; S6 `0 error(s)` and exit 0; S8 `in sync with the tree` and `all checks passed`.
+Expected: S1 all `OK`; S2 no output; S3 `MISSING: none` and eight registrations (`SessionStart`×2, `PreCompact`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`×2); S4 prints `0` twice; S5 all fixtures pass; S6 `0 error(s)` and exit 0; S8 `in sync with the tree` and `all checks passed`.
 
 S8 fails whenever a hook, a `tools/*.py` file, a binding system document or an H2 heading of `CLAUDE.md` is added, removed or renamed without regenerating the manifest: run `python3 tools/nexus-update.py manifest generate` and commit `nexus.manifest.json` with the change. Bump `nexus.version` on release, then regenerate.
 
@@ -187,6 +189,9 @@ These cannot be scripted; they require a real Claude Code session. Perform them 
 | B15 | In a **host** copy with `.nexus/installed.json`, pipe `{"tool_name":"Edit","tool_input":{"file_path":"<host>/.claude/hooks/nexus-exit-gate.py"}}` into the tool gate with `CLAUDE_PROJECT_DIR=<host>` and a completed-bootstrap `state.json` | Denied with `NEXUS CORE FILE: .claude/hooks/nexus-exit-gate.py is owned by Nexus <version>` |
 | B16 | Same, after listing that path in `<host>/.nexus/unlock.txt`; and separately an `Edit` on `CLAUDE.md` or a project document | Allowed (`continue: true`) in both cases |
 | B17 | Same `Edit` on a core path in the **template** (no `installed.json`) | Allowed: the freeze is inactive without a baseline |
+| B18 | Pipe `{"hook_event_name":"SessionStart"}` into `nexus-update-check.py` with `CLAUDE_PROJECT_DIR=<host>`: (a) no `installed.json`; (b) baseline at `v1.0.0` with the real remote; (c) a fresh `.nexus/update-check.json` and a bogus URL; (d) a stale record and a bogus URL; (e) an upstream clone without tags; (f) a corrupt `installed.json` | No output and exit 0 in every case; the record shows `ok 1.0.0` after (b), is untouched after (c), `unreachable` after (d), `no-tags` after (e) |
+| B19 | Same, with the baseline's `upstream.url` pointing at a bare clone that carries a `v9.9.9` tag; then again immediately | One line of `additionalContext` naming `9.9.9` and the installed version, both times; the second run makes no network call (record `checked_at` unchanged) |
+| B20 | Time B18(b) and B19's second run | Well under the 15 s hook timeout: the network run is bounded by the 5 s `ls-remote` timeout, the throttled run is file I/O only |
 
 ### The transcript race (track B4, B9 and B12 carefully)
 
@@ -255,7 +260,7 @@ Do not claim the hooks work until all of these are true:
 
 - [ ] Section 2 static checks S1–S6 and S8 pass
 - [ ] Section 3 fixtures report `FAILURES: 0`, including S7
-- [ ] Section 4 rows B1–B17 observed (B9 assessed against the race note, B4 against the narration note; B15–B17 are scriptable by piping JSON)
+- [ ] Section 4 rows B1–B20 observed (B9 assessed against the race note, B4 against the narration note; B15–B20 are scriptable by piping JSON)
 - [ ] Any hook text that quotes a contract is mirrored in the corresponding spec under `knowledge/specs/`
 - [ ] `knowledge/architecture/architecture--system--overall-structure.md` still describes the actual set of registered hooks, with `updated:` bumped
 - [ ] `.nexus/state.json` is gitignored and no stray `.nexus/state*.json` is staged
