@@ -344,7 +344,39 @@ DO NOT use it:
 
 # 🔄 PART 6 — Updating an EXISTING Nexus project
 
-This part is the **only** correct way to upgrade an existing Nexus-based project to a newer Nexus version. **Do not** re-copy the runtime — you would overwrite the project's `CLAUDE.md` and the navigation index.
+Two mechanisms exist. **Part 6a** is the updater (`tools/nexus-update.py`): it compares your project with the Nexus repository and, once its `apply` subcommand ships, adopts a newer version in one command. **Part 6b** is the older patch-bundle route, kept for one-off migrations that need operator prompts. **Do not** re-copy the runtime by hand — you would overwrite the project's `CLAUDE.md` and the navigation index.
+
+---
+
+## Part 6a — The updater
+
+Requires the baseline from Step 4c (`.nexus/installed.json`). Projects installed before the baseline existed record one first:
+
+```bash
+python3 tools/nexus-update.py baseline --upstream https://github.com/AlexanderShaburov/Nexus.git --guess
+git add .nexus/installed.json
+```
+
+`--guess` scores every release tag and recent commit by how many delivered files match yours and picks the best; files that match nothing are recorded as customized, never overwritten later.
+
+Then, whenever you like:
+
+```bash
+python3 tools/nexus-update.py check      # is a newer Nexus tagged upstream?
+python3 tools/nexus-update.py plan       # what would change, unit by unit; writes nothing
+python3 tools/nexus-update.py plan --diff knowledge/specs/spec--system--exit-gate.md
+python3 tools/nexus-update.py status     # your local state against the baseline
+```
+
+`plan` classes: `update` (yours untouched, upstream changed), `add` (new upstream), `customized` (yours changed, upstream not; left alone), `conflict` (both changed; left alone, exit 1), `removed-locally`, `obsolete`, `converged`, `adopt`, `unbaselined`, `mode-drift`, `unchanged`. The upstream repository is cached under `~/.cache/nexus/template`; `--offline` reuses the cache without network.
+
+👉 `apply` is not shipped yet (plan Phase 3). Until then `plan --diff` plus a hand copy is the way to take a single upstream change.
+
+---
+
+## Part 6b — Patch bundles
+
+This part is the way to apply a **patch bundle** to an existing Nexus-based project.
 
 ---
 
