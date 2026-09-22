@@ -3,7 +3,7 @@ type: spec
 scope: system
 status: approved
 created: 2026-04-17
-updated: 2026-06-04
+updated: 2026-09-22
 source_of_truth: true
 knowledge_visibility: binding
 tags: [frontmatter, metadata, kb-system]
@@ -55,17 +55,27 @@ tags: [<tag1>, <tag2>, ...]
 
 ### type (required)
 
-Defines the document category.
+Defines the document category. It MUST match the semantic role of the directory the document lives in (see `spec--system--knowledge-vault.md`).
 
-Allowed values:
-- spec
-- plan
-- invariant
-- bug
-- decision
-- question
-- index
-- architecture
+Allowed values, with their canonical directory:
+
+| `type` | Directory | Role |
+|---|---|---|
+| `architecture` | `architecture/` | structural description — what exists |
+| `bug` | `bugs/` | defect record |
+| `decision` | `decisions/`, `business/` | rationale for a choice (ADRs use this type) |
+| `glossary` | `glossary/` | domain terminology |
+| `index` | `index/` | routing entry point |
+| `invariant` | `invariants/` | non-negotiable constraint |
+| `pattern` | `patterns/` | reusable approach |
+| `plan` | `plans/` | in-progress intent, roadmap |
+| `prompt` | `runbooks/` | preserved generative prompt (historical origin material) |
+| `question` | `open-questions/` | unresolved question |
+| `runbook` | `runbooks/` | operational procedure |
+| `session` | `sessions/` | execution trace or session summary |
+| `spec` | `specs/` | behavioral contract |
+
+A `type` value outside this list is a validation error. Adding one requires an update to this spec **and** to the directory roles in `spec--system--knowledge-vault.md` — the two lists are a single contract and MUST NOT drift.
 
 ---
 
@@ -85,7 +95,7 @@ Examples:
 
 ### status (required)
 
-Defines lifecycle state.
+Defines lifecycle state (workflow maturity — orthogonal to `knowledge_visibility`).
 
 Allowed values:
 - draft
@@ -94,11 +104,18 @@ Allowed values:
 - approved
 - deprecated
 
+This enum is deliberately closed and free of synonyms. In particular:
+
+| Do NOT use | Use instead | Why |
+|---|---|---|
+| `accepted` | `approved` | same state, one spelling |
+| `archived` | `deprecated` | same state; pair with `knowledge_visibility: historical` |
+
 ---
 
 ### created (required)
 
-Format: YYYY-MM-DD
+Format: `YYYY-MM-DD`.
 
 Represents initial creation date.
 
@@ -106,9 +123,17 @@ Represents initial creation date.
 
 ### updated (required)
 
-Format: YYYY-MM-DD
+Format: `YYYY-MM-DD`.
 
-Must be updated on every meaningful change.
+Must be updated on every meaningful change. MUST NOT be earlier than `created`.
+
+---
+
+### Date format for machine-generated documents
+
+Documents written by a hook MAY use a full ISO 8601 local timestamp, `YYYY-MM-DDTHH:MM:SS`, for `created` and `updated`. This applies to `type: session` archives produced by `nexus-session-writer.py`, which are rewritten several times a day: a date alone would discard the ordering information.
+
+Hand-authored documents MUST use plain `YYYY-MM-DD`.
 
 ---
 
@@ -147,13 +172,30 @@ Invalid combinations (e.g. `knowledge_visibility: binding` with `source_of_truth
 
 ---
 
+### Registered extension fields (optional)
+
+Rule 3 below forbids unknown fields. These are the fields registered so far beyond the required set. Any other field is a validation error until it is added here.
+
+| Field | Applies to | Written by | Meaning |
+|---|---|---|---|
+| `knowledge_visibility` | any document | agent | review-visibility class; see above |
+| `theme` | `type: session`, and any document produced under a themed working session | `nexus-session-writer.py`, agent | working-session theme slug, mirroring `.nexus/session-theme.txt`; groups documents belonging to one line of work |
+| `session_id` | `type: session` | `nexus-session-writer.py` | Claude Code session identifier the archive was generated from |
+| `governs` | `type: spec` | agent | list of subsystems or concerns the spec has authority over |
+
+Fields written by a hook are **machine-owned**: do not hand-edit them, and do not remove them when editing the document body.
+
+---
+
 ## Rules
 
 1. Frontmatter MUST be present in every document.
 2. Field names are case-sensitive.
-3. Unknown fields are not allowed unless explicitly extended by system spec.
+3. Unknown fields are not allowed unless registered under "Registered extension fields" above.
 4. Dates must follow ISO format.
 5. source_of_truth must be explicitly set.
+6. The frontmatter block MUST be valid YAML. In particular, list values use `-` items or inline `[a, b]` — a `*`-bulleted list is not YAML and MUST be rejected.
+7. `type` MUST agree with the document's directory per the table above, and with the filename prefix.
 
 ---
 
@@ -163,7 +205,39 @@ A document is considered valid if:
 
 - All required fields are present
 - All values match allowed formats
-- type and status values are valid enums
+- `type` and `status` values are valid enums
+- `type` agrees with the directory and the filename prefix
+- No unregistered fields are present
+- The block parses as YAML
+- `knowledge_visibility`, if present, does not form an invalid combination (see `spec--system--knowledge-visibility.md` §"Override and Validation Rules")
+
+---
+
+## Filename Contract
+
+The naming convention is normatively defined in `spec--system--knowledge-vault.md` §"Naming Convention":
+
+```
+<type>--<scope>--<name>.md
+```
+
+Two document classes carry additional trailing segments, because they are generated per occurrence rather than authored once:
+
+| Form | Used by | Example |
+|---|---|---|
+| `session--<theme>--<YYYY-MM-DD>--<session-id8>.md` | `nexus-session-writer.py` (automatic) | `session--framing-reset--2026-09-22--55345906.md` |
+| `summary--<theme>--<YYYY-MM-DD>.md` | hand-written session handoff summaries | `summary--framing-reset--2026-09-21.md` |
+
+Both carry `type: session`. The `summary--` prefix is an intentional exception to rule 7: it marks a human-authored summary as distinct from a machine-generated transcript sharing the same `type`. Validation tooling MUST accept these two forms.
+
+### Registered prefix exceptions
+
+Rule 7 requires the filename prefix to equal `type`. The following prefixes are registered exceptions; any other mismatch is a validation error.
+
+| Prefix | `type` | Why |
+|---|---|---|
+| `summary--` | `session` | distinguishes a hand-written handoff summary from a generated transcript |
+| `adr--` | `decision` | preserved on `adr--system--rename-soki-to-nexus.md` only. The filename is cited as a historical artefact by `runbook--system--phase2-nexus-migration.md`; renaming would break eight inbound references for no semantic gain. **Not** a licence for new `adr--` documents — new decision records use `decision--`. |
 
 ---
 

@@ -3,8 +3,9 @@ type: glossary
 scope: system
 status: approved
 created: 2026-04-19
-updated: 2026-05-04
+updated: 2026-09-22
 source_of_truth: true
+knowledge_visibility: binding
 tags: [glossary, terminology, canonical]
 ---
 

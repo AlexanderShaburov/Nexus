@@ -1,9 +1,11 @@
 ---
 type: runbook
+scope: system
 status: deprecated
 created: 2026-04-22
-updated: 2026-05-04
+updated: 2026-09-22
 source_of_truth: false
+knowledge_visibility: historical
 tags:
   - system
   - nexus

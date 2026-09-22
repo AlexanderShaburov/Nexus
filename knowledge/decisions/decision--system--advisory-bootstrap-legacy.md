@@ -3,8 +3,9 @@ type: decision
 scope: system
 status: deprecated
 created: 2026-04-17
-updated: 2026-05-04
+updated: 2026-09-22
 source_of_truth: false
+knowledge_visibility: historical
 tags: [decision, legacy, bootstrap, advisory, deprecated]
 ---
 

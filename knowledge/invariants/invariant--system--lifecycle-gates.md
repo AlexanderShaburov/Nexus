@@ -3,8 +3,9 @@ type: invariant
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-05-04
+updated: 2026-09-22
 source_of_truth: true
+knowledge_visibility: binding
 tags: [invariant, lifecycle, gates, nexus]
 ---
 

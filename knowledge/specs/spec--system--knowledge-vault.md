@@ -3,8 +3,9 @@ type: spec
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-05-04
+updated: 2026-09-22
 source_of_truth: true
+knowledge_visibility: binding
 tags: [knowledge-vault, structure, ontology]
 ---
 
@@ -292,11 +293,22 @@ All documents MUST follow:
 <type>--<scope>--<name>.md
 ```
 
+Lowercase, kebab-case. `<type>` MUST be one of the values enumerated in `spec--system--document-frontmatter.md` §"type", MUST equal the document's own `type:` field, and MUST match the directory's semantic role.
+
 Examples:
 
 - architecture--system--overall-structure.md
 - spec--editor--media-editor-behavior.md
 - decision--data--json-vault.md
+
+### Generated document forms
+
+Two classes of document in `sessions/` carry additional trailing segments because they are generated per occurrence:
+
+- `session--<theme>--<YYYY-MM-DD>--<session-id8>.md` — written automatically by `nexus-session-writer.py`
+- `summary--<theme>--<YYYY-MM-DD>.md` — hand-written session handoff summary
+
+Both carry `type: session`. Full contract: `spec--system--document-frontmatter.md` §"Filename Contract".
 
 ---
 

@@ -1,17 +1,12 @@
 ---
-
-id: adr--system--rename-soki-to-nexus
 type: decision
-status: accepted
+scope: system
+status: approved
 created: 2026-04-22
-updated: 2026-05-04
-tags:
-
-* system
-* naming
-* architecture
-* knowledge-vault
-
+updated: 2026-09-22
+source_of_truth: true
+knowledge_visibility: binding
+tags: [decision, adr, system, naming, architecture, knowledge-vault]
 ---
 
 ## Relations
