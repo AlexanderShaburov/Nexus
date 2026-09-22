@@ -74,14 +74,18 @@ def main() -> int:
             "Finish Session Bootstrap first: read the Mandatory Startup Reading Set "
             "(invariants + architecture + orchestration spec + navigation index), "
             "then emit the 'Session Bootstrap Completed' confirmation block. "
-            "Read/Glob/Grep/LS on knowledge/ are currently permitted."
+            "Read-only tools (Read/Glob/Grep/LS/NotebookRead) remain permitted."
         )
         emit_block(reason, hook_event="PreToolUse")
         return 0
 
     # ---- bootstrap-completed branch -----------------------------------------------
     if tool in MUTATING_TOOLS:
-        turn_text = read_transcript_current_turn(transcript_path)
+        # Retry until the Context Decision is visible: a text block emitted in the
+        # same assistant message as this tool call may not be on disk yet.
+        turn_text = read_transcript_current_turn(
+            transcript_path, until=lambda t: find_decision_gate(t) is not None
+        )
         decision = find_decision_gate(turn_text)
         if decision is None:
             reason = (

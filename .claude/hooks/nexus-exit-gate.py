@@ -34,7 +34,9 @@ def main() -> int:
         return 0
 
     transcript_path = inp.get("transcript_path") or ""
-    turn_text = read_transcript_current_turn(transcript_path)
+    # Retry until the Closure Block is visible: the final assistant text block is
+    # persisted asynchronously and may not be on disk yet when Stop fires.
+    turn_text = read_transcript_current_turn(transcript_path, until=find_closure_block)
     if not turn_text:
         # Can't verify — fail open so transcript-read issues don't deadlock the agent.
         emit({"continue": True})

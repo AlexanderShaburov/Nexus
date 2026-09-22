@@ -12,7 +12,8 @@ import os
 import pathlib
 import re
 import sys
-from typing import Any, Iterable
+import time
+from typing import Any, Callable
 
 REQUIRED_FILES = [
     "knowledge/index/index--system--project-navigation.md",
@@ -140,10 +141,6 @@ def relpath_from_project(path_str: str) -> str:
         return p.as_posix().lstrip("./")
 
 
-def is_under_knowledge(rel_path: str) -> bool:
-    return rel_path.startswith("knowledge/")
-
-
 def invariants_present() -> list[str]:
     inv = project_dir() / REQUIRED_INVARIANTS_DIR
     if not inv.is_dir():
@@ -170,8 +167,36 @@ def mark_bootstrap_if_complete(state: dict[str, Any]) -> bool:
     return True
 
 
-def read_transcript_current_turn(transcript_path: str) -> str:
-    """Return concatenated assistant text emitted since the most recent user message."""
+def read_transcript_current_turn(
+    transcript_path: str,
+    until: "Callable[[str], Any] | None" = None,
+    attempts: int = 4,
+    delay: float = 0.08,
+) -> str:
+    """Return concatenated assistant text emitted since the most recent user message.
+
+    The transcript is read from disk, but Claude Code persists the assistant's
+    text blocks asynchronously: a Stop or PreToolUse hook can run before the
+    block carrying the Closure Block / Context Decision has been flushed. The
+    gates then see a non-empty-but-incomplete turn and block a compliant
+    response.
+
+    `until` is a predicate over the turn text. When supplied, the file is
+    re-read up to `attempts` times until the predicate is satisfied. A
+    compliant turn matches on the first read and pays nothing; only the
+    genuinely-missing case pays the full (attempts-1) * delay budget, which
+    at the defaults is 240 ms against a 15 s hook timeout.
+    """
+    for attempt in range(attempts):
+        text = _read_transcript_once(transcript_path)
+        if until is None or until(text):
+            return text
+        if attempt < attempts - 1:
+            time.sleep(delay)
+    return text
+
+
+def _read_transcript_once(transcript_path: str) -> str:
     if not transcript_path or not os.path.isfile(transcript_path):
         return ""
     try:
