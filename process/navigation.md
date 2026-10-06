@@ -11,7 +11,7 @@ updated: 2026-10-06
 
 ## Now
 
-Position: Per the charter, Nexus has two layers of context. The first layer, knowledge of the project, is done, released as version 1.3.0 and running in several host projects. The second layer, management of the project, is being introduced now; that is the current change. It is built in this repository only and has reached this point: the layer's rules are written (the process-space specification, a draft), the layer's first document exists and is agreed (the charter), the second is being written (this file). The runtime does not read these files yet, and no host has them.
+Position: Per the charter, Nexus has two layers of context. The first layer, knowledge of the project, is done, released as version 1.3.0 and running in several host projects. The second layer, management of the project, is being introduced now; that is the current change. It is built in this repository only and has reached this point: the layer's rules are written (the process-space specification, a draft), both of the layer's documents exist and are agreed (the charter and this navigation). The runtime does not read these files yet, and no host has them.
 
 Heading: One question: can two one-screen files, the charter and this navigation, tell a fresh agent where the project is? Check: at the start of the next few sessions the agent reads both files by hand and states the position; the operator judges whether it is right. Until that answer exists, the hooks are not touched.
 
