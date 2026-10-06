@@ -65,7 +65,7 @@ It is written at the resolution it recommends: four document kinds, no new gate,
 | What is this project, what counts as good, how do we validate, when is work done? | `process/charter.md` | an exploratory project; a level is done when its question has an answer |
 | Where are we now, what single question is being tested, why there and now, what do we ignore for now? | `process/navigation.md` | Position: two files exist and are read at bootstrap |
 | What is the road, coarsely? | `process/roadmap--*.md` | trace from a folder → mail → CRM |
-| What is the one-screen contract of the current step? | `process/iteration--*.md` | Trace v0 |
+| What is the one-screen contract of the current transition? | `process/iteration--*.md` | Net paper test |
 
 A document that states a fact about the system belongs in `knowledge/`, whatever its author intended. A document that states intent, position or policy belongs in `process/`. A roadmap in `knowledge/plans/` is legal and stays legal; this spec adds a place for the *coarse* road and the *current* step, it does not move existing plans.
 
@@ -80,9 +80,9 @@ In the Nexus template repository itself, `process/` describes Nexus as a project
 | `type` | Filename | Cardinality | Role |
 |---|---|---|---|
 | `charter` | `charter.md` | exactly one | nature of the project, goal, what counts as good, policies |
-| `navigation` | `navigation.md` | exactly one | current position, heading, horizon, critical path, uncertainty and validation points |
+| `navigation` | `navigation.md` | exactly one | current position, heading, the net of project states and transitions, uncertainty and validation points |
 | `roadmap` | `roadmap--<name>.md` | one per track | the whole road at low resolution |
-| `iteration` | `iteration--<slug>.md` | many | one-screen contract of one step: question, input, deliberately ignored, artifact, success, unknowns |
+| `iteration` | `iteration--<slug>.md` | many | one-screen contract of one transition of the net: question, input, work, deliberately ignored, artifact, success, unknowns |
 
 Filenames are lowercase kebab-case. The two fixed files carry no suffix: there is only ever one of each. The other two carry `<type>--<name>.md` without a `scope` segment: the directory already belongs to one project, and directions inside the project are distinguished by the `track` field, not by the filename.
 
@@ -101,6 +101,7 @@ Every document in `process/` MUST begin with a YAML block. Two groups of fields 
 | `type` | yes | `charter`, `navigation`, `roadmap`, `iteration` | document kind; MUST equal the filename prefix (or the fixed name) |
 | `status` | yes | `draft`, `review`, `approved`, `deprecated` | maturity of the document: has the operator agreed to it? Same closed enum as the vault; `in-progress` is not used here because the work's progress is `state` |
 | `owner` | yes | `operator`, `agent` | who may change the document without asking in the turn |
+| `id` | `iteration` | `T<n>` | the transition in `navigation.md` `## Net` that this iteration is the contract of; MUST exist there |
 
 **Where does the work stand?**
 
@@ -145,6 +146,7 @@ Example, iteration:
 ```yaml
 ---
 type: iteration
+id: T2
 status: approved
 state: in_progress
 owner: agent
@@ -200,8 +202,16 @@ Each kind has a fixed set of H2 sections, in order, each present even when short
 ### `navigation.md`
 
 - `## Now` — four labelled lines, read by the runtime (§8): `Position:` where the project really is, as facts; `Heading:` the one question being tested, with a pointer to the `in_progress` iteration; `Why here:` why this question now and not another, in terms of the charter's goal and the critical path, so that going deep here is distinguishable from burrowing; `Ignoring:` what is deliberately out of scope at this level. The `Why here` line was added on 2026-10-06 after the first cold reading of Nexus's own navigation: the agent stated the position correctly and could not say why the project worked there.
-- `## Horizon` — what is visible ahead but not elaborated, one line each.
-- `## Critical path` — the few things that must happen in order.
+- `## Net` — the project as a net of states and transitions, in the sense of a Petri net: places are project states, transitions are work, the marking is the position. Two lists with a one-line grammar, readable by eye and by a regular expression:
+
+  ```
+  - [x] P<n> <slug> — <phrase>. check: <what established it>
+  - [ ] P<n> <slug> — <phrase>
+  - T<n> <slug>: <P..> → <P..>  [!] [?] [← now] — <phrase>
+    task: process/iteration--<slug>.md
+  ```
+
+  A marked place MUST carry `check:`. `!` marks a critical transition: every path from the marking to the goal passes through it. `?` marks a transition whose feasibility is unknown. `← now` marks the one transition being worked; it MUST be *enabled*, that is, all its input places marked, or the file is invalid. The `task:` line names the iteration contract; it is required on the `← now` transition, allowed on the next one, and absent further out (§9). The net replaced the earlier `## Horizon` and `## Critical path` sections on 2026-10-06: a critical path is a degenerate net, and a far place is simply an unmarked place that no elaborated transition leads to yet. Graph structure (inputs, outputs, what a transition unlocks) lives only here; the iteration file never restates it.
 - `## Uncertainty points` — what we may not know enough about, including whether the project is feasible as currently conceived.
 - `## Validation points` — where and how we will see whether we are on track.
 
@@ -217,7 +227,8 @@ A roadmap is coarse by contract. A level marked `far` is one line. Elaboration h
 The one-screen contract:
 
 - `## Question` — the single question this iteration answers.
-- `## Input` — what it starts from.
+- `## Input` — what it starts from, as prose; the input places are in the net.
+- `## Work` — what will actually be done: the length of the step, not its direction.
 - `## We deliberately ignore` — the list that protects the iteration from premature complexity.
 - `## Artifact` — what exists afterwards that did not before.
 - `## Success` — how we know the question is answered.
@@ -237,6 +248,8 @@ The one-screen contract:
 
 The writeback evaluation that the Exit Gate already requires gains one question: *did the project's position move, and does `navigation.md` say so?* This is advisory and lives in the spec text, not in the Closure Block.
 
+**Marking rule.** A place changes from `[ ]` to `[x]` only at the closure of the turn that established it, only with its `check:`, and the `← now` mark moves in the same edit. The charter's validation policy applies: a check is real work observed, never a specification or a selftest alone.
+
 ## 8. What the runtime reads
 
 Contract for the hooks; realization status in §10.
@@ -247,11 +260,15 @@ Contract for the hooks; realization status in §10.
 4. **Staleness** (`SessionStart` only, advisory, one line): any `process/` document whose `review_by` has passed, and any `iteration` with `state: in_progress` whose `updated` is older than 14 days. The number is a first guess and is changed here when it proves wrong.
 5. **Validation** (`PostToolUse`, advisory, as for the vault): the rules of §4–§6 as a second rule set in `tools/validate-vault.py`, selected by the `process/` path, with codes `PR…`. The CLI validates both directories in one run.
 
-Nothing in `process/` is ever gated. The runtime reads it, reports on it, and never blocks on it.
+6. **Position gate** (`PreToolUse`): the Context Decision claim (`spec--system--context-decision-gate.md`, Form A) gains `--step T<n>`. Before the first mutating call of a turn the gate reads `## Net` and denies, naming the defect, when the transition is unknown, when an input place is unmarked, when the transition has already fired (all outputs marked), or when it has no `task:` contract. Two escape hatches, both explicit and both printed in full so the operator sees them: `--step none --reason` for work that changes no project state, and `--override --reason` for firing a transition that is not enabled. The gate checks structure, never words: what it verifies are facts about the net, not the agent's assertion that the work is on the path. Designed 2026-10-06; built after P5 of Nexus's own net (T4).
+
+One gate, then. Everything else in `process/` is read, reported on, and never blocked on. The first version of this spec said *nothing* in `process/` is gated; the dialogue of 2026-10-06 reversed that for the position decision, on the observation that every rule Nexus leaves to goodwill turns into a ritual, and that the gates of the first layer bite exactly where they verify facts a hook can check.
 
 ## 9. The horizon rule
 
-This is the lever the rest exists for.
+This is the lever the rest exists for. It rests on a principle agreed on 2026-10-06, stated first.
+
+**Critical transition first.** A transition is critical when every path from the current marking to the goal passes through it. Criticality is a property of position in the net, not of difficulty or cost. The dangerous case is a critical transition whose feasibility is unknown: everything done around it is pseudo-progress, real work without movement, because the place everything depends on stays unmarked. Therefore: critical transitions are identified before anything else, which is why the net exists from the first day and not "when more than one step is visible"; for a critical transition of unknown feasibility the first and only work is to establish whether it can fire at all, at the coarsest sufficient precision, and work downstream of it does not start; and infeasibility is a signal, not a failure, with three exits (solve the transition another way, rebuild the net so the path to the goal bypasses it, or admit that the goal in this form does not exist), chosen by the operator but raised by the agent, loudly and first, because people work where it is clear rather than where it is frightening. The horizon rule below is this principle applied to resolution: a place whose inputs are unmarked is described in one line, because any more precision rests on nothing.
 
 - `horizon: far` → the document, or the roadmap line, is at most a few lines: a name, a question, why it matters. No design, no options, no sub-steps.
 - `horizon: mid` → the question and the unknowns may be elaborated; the solution may not.
@@ -280,13 +297,18 @@ For `tools/validate-vault.py`; codes reserved here so that the implementation an
 | `PR100` | warning: `review_by` has passed |
 | `PR101` | warning: `iteration` in `in_progress` with `updated` older than 14 days |
 | `PR102` | warning: `charter.md` exists and `navigation.md` does not, or vice versa |
+| `PR011` | `## Net` parses under the grammar of §6; every place and transition id is unique; every transition input and output names an existing place; a marked place carries `check:` |
+| `PR012` | exactly one `← now` transition, and it is enabled; its `task:` file exists and carries the matching `id` |
+| `PR013` | an `iteration` with `id` names a transition that exists in the net |
 
 ## 11. Realization status and what waits
 
 | Item | Status on 2026-10-06 |
 |---|---|
 | this spec | draft; becomes `approved` after the two fixed files exist for Nexus itself and have survived a few sessions |
-| `process/charter.md`, `process/navigation.md` for Nexus | next step, hand-written in dialogue |
+| `process/charter.md`, `process/navigation.md` for Nexus | written 2026-10-06; navigation carries the net since the same day |
+| the net's paper test (P5 in Nexus's own net) | in progress; contract `process/iteration--net-paper-test.md` |
+| position gate (§8.6) | designed; built after P5 |
 | validator rule set `PR…` | pending; after the two files exist |
 | bootstrap and PreCompact reading (§8.1–8.2) | pending |
 | per-turn `## Now` digest (§8.3) | pending |
