@@ -25,6 +25,13 @@ Can a one-screen net of project states and transitions tell, mechanically, which
 
 Run both cases through the net by hand, as the future tool gate would: name the transition the work corresponds to, check whether its inputs are marked, and record what the claim would have printed or denied. Then have the operator read the navigation file cold and say whether it is one screen and whether the position and the reason are clear from it.
 
+Status 2026-10-06, end of session: both runs are done (session archive `knowledge/sessions/session--progressive-resolution--2026-10-06--f0eebfe5.md`, the agent's reply after commit b864a0e). Arbitrage case: denied, input A3 safe-arbitrage-exists unmarked. Nexus case: surfaced only, via `--step none`. Two operator judgements are pending and the next session MUST open by asking them again:
+
+1. For work that changes no project state, is it enough that `--step none` is printed and seen, or must it be denied when the turn would touch design-bearing paths (`knowledge/specs`, `architecture`, `plans`, `process/`)?
+2. Read `process/navigation.md` cold: is it one screen, and are the position and the reason clear from it? The agent doubts the screen (56 lines, long Position line) and will shorten `## Now` if told so.
+
+One observation to classify then: the mechanism catches burrowing only past places that were named; naming the critical places is an act of the principle at net-writing time, not of any hook.
+
 ## We deliberately ignore
 
 - Any hook or tool code; the test is on paper.
