@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="Claude Code" version="24.7.0" type="device">
+  <diagram id="nexus-algorithm" name="Nexus — алгоритм работы">
+    <mxGraphModel dx="1600" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="2336" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Nexus 1.3.0 — схема алгоритма работы: цепи движения информации и действий" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="5" width="1560" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="R1" value="1. Жизненный цикл сессии — события Claude Code, хуки Nexus и агент" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fcfcfc;strokeColor=#8c8c8c;dashed=1;verticalAlign=top;align=left;fontStyle=1;fontSize=14;spacingLeft=10;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="60" width="1060" height="1500" as="geometry" />
+        </mxCell>
+        <mxCell id="R2" value="2. Knowledge Vault (knowledge/) — источник контекста и память" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fcfcfc;strokeColor=#8c8c8c;dashed=1;verticalAlign=top;align=left;fontStyle=1;fontSize=14;spacingLeft=10;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="60" width="460" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="R3" value="3. Состояние среды (.nexus/)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fcfcfc;strokeColor=#8c8c8c;dashed=1;verticalAlign=top;align=left;fontStyle=1;fontSize=14;spacingLeft=10;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="790" width="460" height="360" as="geometry" />
+        </mxCell>
+        <mxCell id="R4" value="4. Контур обновления и обратной связи: хост ↔ шаблон Nexus" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fcfcfc;strokeColor=#8c8c8c;dashed=1;verticalAlign=top;align=left;fontStyle=1;fontSize=14;spacingLeft=10;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1600" width="1560" height="540" as="geometry" />
+        </mxCell>
+        <mxCell id="RL" value="Легенда" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fcfcfc;strokeColor=#8c8c8c;dashed=1;verticalAlign=top;align=left;fontStyle=1;fontSize=14;spacingLeft=10;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="1180" width="460" height="380" as="geometry" />
+        </mxCell>
+        <mxCell id="L1" value="Claude Code — события" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=none;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="90" width="300" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="L2" value="Хуки Nexus (.claude/hooks/)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=none;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="380" y="90" width="360" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="L3" value="Агент (Claude)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=none;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="760" y="90" width="320" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="sep1" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d0d0d0;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="369" y="130" width="2" height="1410" as="geometry" />
+        </mxCell>
+        <mxCell id="sep2" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d0d0d0;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="749" y="130" width="2" height="1410" as="geometry" />
+        </mxCell>
+        <mxCell id="E1" value="SessionStart / PreCompact" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="150" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="H1" value="&lt;b&gt;nexus-bootstrap.py&lt;/b&gt;&lt;br&gt;сброс .nexus/state.json (bootstrap = pending);&lt;br&gt;инъекция Mandatory Startup Reading Set в контекст первого хода" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;" vertex="1" parent="1">
+          <mxGeometry x="380" y="140" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="H1b" value="&lt;b&gt;nexus-update-check.py&lt;/b&gt; (не блокирует, молчит при сбоях)&lt;br&gt;хост: раз в 24 ч один git ls-remote --tags (5 с), одна строка, если есть новый тег v*;&lt;br&gt;шаблон: число заметок в feedback-inbox при каждом старте" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#fff2cc;strokeColor=#d6b656;align=left;" vertex="1" parent="1">
+          <mxGeometry x="380" y="240" width="360" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="A1" value="&lt;b&gt;Агент читает обязательный набор&lt;/b&gt;&lt;br&gt;invariants/* → architecture--system--overall-structure → spec knowledge-driven-task-orchestration → index--system--project-navigation" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#d5e8d4;strokeColor=#82b366;align=left;" vertex="1" parent="1">
+          <mxGeometry x="760" y="140" width="320" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="H2" value="&lt;b&gt;nexus-tool-gate.py&lt;/b&gt; (PreToolUse, пока bootstrap = pending)&lt;br&gt;разрешены только Read / Glob / Grep / LS / NotebookRead, на любом пути;&lt;br&gt;каждое Read нужного файла → read-ledger;&lt;br&gt;набор прочитан полностью → bootstrap = completed" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;" vertex="1" parent="1">
+          <mxGeometry x="380" y="350" width="360" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="A2" value="&lt;b&gt;«Session Bootstrap Completed»&lt;/b&gt;&lt;br&gt;агент выводит блок подтверждения; режим Knowledge-Driven: ACTIVE" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#d5e8d4;strokeColor=#82b366;align=left;" vertex="1" parent="1">
+          <mxGeometry x="760" y="360" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="E2" value="UserPromptSubmit&lt;br&gt;(запрос пользователя)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="490" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="H3" value="&lt;b&gt;nexus-prompt-gate.py&lt;/b&gt;&lt;br&gt;сброс per-turn флагов (decision_gate_seen = false);&lt;br&gt;инъекция контракта хода: Decision Gate + Exit Gate&lt;br&gt;(или напоминание «bootstrap не завершён»)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;" vertex="1" parent="1">
+          <mxGeometry x="380" y="480" width="360" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="A3" value="&lt;b&gt;Retrieve&lt;/b&gt;&lt;br&gt;агент читает нужные документы vault:&lt;br&gt;index → declared relations → остановка при достаточном контексте" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#d5e8d4;strokeColor=#82b366;align=left;" vertex="1" parent="1">
+          <mxGeometry x="760" y="480" width="320" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="A4" value="&lt;b&gt;Context Decision&lt;/b&gt; (один раз за ход)&lt;br&gt;claim: python3 tools/nexus-decide.py --kb YES|NO --reads … --reason …&lt;br&gt;или текст «### Context Decision» в ответе" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#d5e8d4;strokeColor=#82b366;align=left;" vertex="1" parent="1">
+          <mxGeometry x="760" y="600" width="320" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="E3" value="PreToolUse&lt;br&gt;(мутирующий инструмент: Edit / Write / MultiEdit / NotebookEdit / Bash / Task)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="730" width="300" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="D1" value="bootstrap&lt;br&gt;pending?" style="rhombus;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="400" y="720" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="X1" value="deny: разрешены только read-инструменты" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="620" y="735" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="D2" value="хост + путь — core Nexus и нет в unlock.txt?" style="rhombus;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="400" y="840" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="X2" value="deny: core freeze (NEXUS CORE FILE)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="620" y="855" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="D3" value="Context Decision&lt;br&gt;есть в этом ходе?" style="rhombus;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="400" y="960" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="X3" value="deny: показать обе формы (или дефект claim)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="620" y="975" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="D3n" value="проверка по порядку: флаг хода уже установлен → claim из tool_input.command → текст «### Context Decision» в транскрипте" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="400" y="1055" width="340" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="OK" value="allow → turn.decision_gate_seen = true" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="1100" width="200" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="A5" value="&lt;b&gt;Инструмент выполняется&lt;/b&gt;&lt;br&gt;меняется код и/или документы vault" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#d5e8d4;strokeColor=#82b366;align=left;" vertex="1" parent="1">
+          <mxGeometry x="760" y="1090" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="E4" value="PostToolUse&lt;br&gt;(Edit / Write / MultiEdit / NotebookEdit)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1190" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="H5" value="&lt;b&gt;nexus-vault-validator.py&lt;/b&gt; (advisory, не блокирует)&lt;br&gt;файл под knowledge/**.md → правила tools/validate-vault.py&lt;br&gt;→ findings в контекст; молчит, если документ чист; никогда не правит" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#fff2cc;strokeColor=#d6b656;align=left;" vertex="1" parent="1">
+          <mxGeometry x="380" y="1180" width="360" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="A6" value="&lt;b&gt;Ground + Sync&lt;/b&gt;&lt;br&gt;работа с учётом инвариантов и спек, конфликты — явно;&lt;br&gt;writeback в vault (plans / specs / decisions / bugs / feedback);&lt;br&gt;python3 tools/validate-vault.py; commit вместе с кодом" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#d5e8d4;strokeColor=#82b366;align=left;" vertex="1" parent="1">
+          <mxGeometry x="760" y="1190" width="320" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="A7" value="&lt;b&gt;Closure Block&lt;/b&gt; в конце ответа&lt;br&gt;code changed / KB changed / session log written / writeback evaluation performed (+ «KB unchanged because …»)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#d5e8d4;strokeColor=#82b366;align=left;" vertex="1" parent="1">
+          <mxGeometry x="760" y="1320" width="320" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="E5" value="Stop&lt;br&gt;(конец ответа агента)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1330" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="H6" value="&lt;b&gt;nexus-exit-gate.py&lt;/b&gt;&lt;br&gt;разбор транскрипта последнего хода → Closure Block найден? поля и правила зависимостей верны?&lt;br&gt;нарушение → decision: block + корректирующий prompt" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;" vertex="1" parent="1">
+          <mxGeometry x="380" y="1310" width="360" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="H7" value="&lt;b&gt;nexus-session-writer.py&lt;/b&gt; (не блокирует, молчит)&lt;br&gt;user prompt + assistant text (без tool calls / thinking) →&lt;br&gt;knowledge/sessions/session--&amp;lt;theme&amp;gt;--&amp;lt;date&amp;gt;--&amp;lt;id8&amp;gt;.md;&lt;br&gt;перезапись на месте; тема из .nexus/session-theme.txt" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#fff2cc;strokeColor=#d6b656;align=left;" vertex="1" parent="1">
+          <mxGeometry x="380" y="1430" width="360" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="E1" target="H1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="затем" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#d6b656;" edge="1" parent="1" source="H1" target="H1b">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="Reading Set → контекст" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#6c8ebf;dashed=1;" edge="1" parent="1" source="H1" target="A1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="каждое Read проходит PreToolUse" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="A1" target="H2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="bootstrap = completed" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="H2" target="A2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="ожидание запроса" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="A2" target="E2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="920" y="460" />
+              <mxPoint x="210" y="460" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="E2" target="H3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="контракт хода → контекст" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#6c8ebf;dashed=1;" edge="1" parent="1" source="H3" target="A3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="A3" target="A4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="первый мутирующий вызов" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="A4" target="E3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="920" y="710" />
+              <mxPoint x="210" y="710" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="E3" target="D1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="да" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#b85450;" edge="1" parent="1" source="D1" target="X1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="нет" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="D1" target="D2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" value="да" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#b85450;" edge="1" parent="1" source="D2" target="X2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" value="нет" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="D2" target="D3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" value="нет" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#b85450;" edge="1" parent="1" source="D3" target="X3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e17" value="да" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="D3" target="OK">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e18" value="агент добавляет Decision и повторяет вызов" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#b85450;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="X3" target="A4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e19" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="OK" target="A5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e20" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="A5" target="E4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="920" y="1175" />
+              <mxPoint x="210" y="1175" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e21" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="E4" target="H5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e22" value="findings → контекст" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#6c8ebf;dashed=1;" edge="1" parent="1" source="H5" target="A6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e23" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="A6" target="A7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e24" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="A7" target="E5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="920" y="1315" />
+              <mxPoint x="210" y="1315" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e25" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="E5" target="H6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e26" value="параллельно" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#d6b656;exitX=0.5;exitY=1;entryX=0;entryY=0.5;" edge="1" parent="1" source="E5" target="H7">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="210" y="1480" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e27" value="block: исправить Closure Block" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#b85450;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="H6" target="A7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e28" value="ход завершён → следующий запрос" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="H6" target="E2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="50" y="1360" />
+              <mxPoint x="50" y="520" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="V0" value="Приоритет чтения: invariants → architecture → specs → decisions → patterns → plans → sessions → glossary. Навигация по index и declared relations; grep — запасной путь." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="100" width="420" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="V1" value="&lt;b&gt;index/&lt;/b&gt; — точка входа, маршрутизация по классам документов" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="160" width="420" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V2" value="&lt;b&gt;invariants/&lt;/b&gt; — непреложные ограничения: lifecycle gates, review classification" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="210" width="420" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V3" value="&lt;b&gt;architecture/&lt;/b&gt; — что существует (компоненты, control flow, контракты данных)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="260" width="420" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V4" value="&lt;b&gt;specs/&lt;/b&gt; — контракты поведения: session-bootstrap, context-decision-gate, exit-gate, knowledge-vault, document-frontmatter, knowledge-visibility, architecture-review, nexus-update, feedback-channel" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="310" width="420" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="V5" value="&lt;b&gt;decisions/&lt;/b&gt; — почему так; &lt;b&gt;patterns/&lt;/b&gt; — повторно используемые приёмы" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="390" width="420" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V6" value="&lt;b&gt;plans/&lt;/b&gt; — незавершённые намерения (development class); runbooks/, bugs/, open-questions/, glossary/, business/" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="440" width="420" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="V7" value="&lt;b&gt;sessions/&lt;/b&gt; — архив сессий (historical, не источник истины) и ручные summary--… handoff-документы" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="500" width="420" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="V8" value="&lt;b&gt;feedback/&lt;/b&gt; — заметки о самом Nexus (kind: bug | wish | praise) для отправки upstream; обновлятель их не трогает" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="560" width="420" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="V9" value="Каждый документ: YAML frontmatter (type, scope, status, created, updated, source_of_truth, tags, knowledge_visibility); имя &amp;lt;type&amp;gt;--&amp;lt;scope&amp;gt;--&amp;lt;name&amp;gt;.md; type = каталог = префикс; проверка tools/validate-vault.py (FM / VS / NM / LK)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="620" width="420" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="v1" value="Bootstrap: читает" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#9673a6;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="A1" target="V1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v2" value="Retrieve: index → relations" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#9673a6;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="A3" target="V1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1120" y="525" />
+              <mxPoint x="1120" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="v3" value="Sync: writeback (plans / specs / decisions / bugs / feedback)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#9673a6;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="A6" target="V6">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1110" y="1240" />
+              <mxPoint x="1110" y="465" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="v4" value="пишет session--*.md" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#9673a6;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="H7" target="V7">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1100" y="1480" />
+              <mxPoint x="1100" y="525" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="v5" value="проверяет frontmatter одного документа" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#9673a6;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="H5" target="V9">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1090" y="1225" />
+              <mxPoint x="1090" y="655" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="S1" value="&lt;b&gt;state.json&lt;/b&gt; — статус bootstrap, read-ledger, индекс хода, флаг и содержание Context Decision текущего хода (gitignored; пересоздаётся на SessionStart)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="830" width="420" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="S2" value="&lt;b&gt;session-theme.txt / session-file.txt&lt;/b&gt; — тема и владелец архива сессии (JSON с session_id: чужая сессия файл не переименует)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="900" width="420" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="S3" value="&lt;b&gt;installed.json&lt;/b&gt; — baseline установки: версия Nexus, upstream, SHA-256 каждого owned-юнита (коммитится; есть только в хосте)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="960" width="420" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="S4" value="&lt;b&gt;unlock.txt&lt;/b&gt; — core-пути, которые оператор разрешил хосту править" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="1020" width="420" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="S5" value="&lt;b&gt;update-check.json&lt;/b&gt; — последняя проверка upstream (троттлинг 24 ч); &lt;b&gt;backups/&lt;/b&gt; — копии файлов перед apply" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="1070" width="420" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" value="reset" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#808080;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="H1" target="S1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1130" y="180" />
+              <mxPoint x="1130" y="860" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s2" value="читает / пишет turn.decision" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#808080;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="OK" target="S1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1140" y="1125" />
+              <mxPoint x="1140" y="860" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s3" value="читает installed.json + unlock.txt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#808080;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="D2" target="S3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1150" y="885" />
+              <mxPoint x="1150" y="985" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s4" value="троттлинг" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#808080;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="H1b" target="S5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1125" y="285" />
+              <mxPoint x="1125" y="1095" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s5" value="тема, владелец" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#808080;dashed=1;exitX=1;exitY=0.75;entryX=0;entryY=0.5;" edge="1" parent="1" source="H7" target="S2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1150" y="1505" />
+              <mxPoint x="1150" y="925" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lg0" value="" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="1215" width="40" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lt0" value="Событие Claude Code (hook event)" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="1211" width="370" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg1" value="" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="1249" width="40" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lt1" value="Хук-enforcer: может отказать (deny) или заблокировать завершение (block)" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="1245" width="370" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg2" value="" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#fff2cc;strokeColor=#d6b656;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="1283" width="40" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lt2" value="Хук без блокировки: только контекст, архив, уведомление" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="1279" width="370" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg3" value="" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#d5e8d4;strokeColor=#82b366;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="1317" width="40" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lt3" value="Действие агента (Claude)" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="1313" width="370" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg4" value="" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="1351" width="40" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lt4" value="Knowledge Vault — документы" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="1347" width="370" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg5" value="" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="1385" width="40" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lt5" value="Состояние среды (.nexus/) и контракты" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="1381" width="370" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lg6" value="" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="1419" width="40" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="lt6" value="Отказ / блокировка" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="1415" width="370" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lgE" value="Сплошная стрелка — поток управления; синий пунктир — инъекция контекста хуком; фиолетовый пунктир — чтение/запись vault; серый пунктир — чтение/запись .nexus/; красная — отказ." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="1457" width="420" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lgS" value="Источники: knowledge/architecture/architecture--system--overall-structure.md (Control Flow, Data Contracts); спеки session-bootstrap, context-decision-gate, exit-gate, nexus-update, feedback-channel. Nexus 1.3.0." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="1513" width="420" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="C1h" value="Шаблон Nexus (этот репозиторий)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=none;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1640" width="440" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="C2h" value="Локальный кэш ${NEXUS_UPSTREAM_CACHE:-~/.cache/nexus}/ — без сети к хосту, без учётных данных" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=none;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="560" y="1640" width="420" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="C3h" value="Хост-проект (Nexus установлен)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=none;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="1640" width="520" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="T1" value="&lt;b&gt;Релиз шаблона&lt;/b&gt;&lt;br&gt;nexus.version (semver); nexus.manifest.json — список owned-путей и стратегий (replace / sections / index-entries / hooks-merge / ensure-lines / create-if-absent) + never_touch; manifest generate | verify; тег v*" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1690" width="440" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="K1" value="&lt;b&gt;template/&lt;/b&gt; — bare clone&lt;br&gt;git fetch тегов; файлы читаются через git show; в хост ничего не checkout-ится; --offline без сети" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="560" y="1690" width="420" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="U1" value="&lt;b&gt;tools/nexus-update.py&lt;/b&gt; (оператор, из обычного терминала)&lt;br&gt;check → plan: трёхсторонняя таблица baseline / local / upstream по каждому owned-юниту (unchanged / update / customized / conflict / refused …) → apply --apply: backup в .nexus/backups/, hooks последними, baseline переписан, validate-vault + selftest.&lt;br&gt;install / up / nexus.py — установка и retrofit; отказ при грязном дереве и живой сессии" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="1690" width="520" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="U2" value="&lt;b&gt;.nexus/installed.json&lt;/b&gt; → core freeze в nexus-tool-gate.py: правки core-файлов Nexus в хосте запрещены; исключения — .nexus/unlock.txt" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="1850" width="520" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="F1" value="&lt;b&gt;Обратная связь из хоста&lt;/b&gt;&lt;br&gt;гейт запретил core-правку / conflict в plan / Nexus мешает или помогает → агент пишет knowledge/feedback/feedback--nexus--&amp;lt;slug&amp;gt;.md (kind: bug | wish | praise), коммитит;&lt;br&gt;feedback push → в delivered: добавляется receipt inbox:&amp;lt;ts&amp;gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#d5e8d4;strokeColor=#82b366;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="1960" width="520" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="K2" value="&lt;b&gt;inbox/&amp;lt;host&amp;gt;/&lt;/b&gt;&lt;br&gt;&amp;lt;timestamp&amp;gt;--feedback--nexus--&amp;lt;slug&amp;gt;.md + .json sidecar (host, commit, fingerprint, sha256, kind, version…);&lt;br&gt;inbox-archive/&amp;lt;host&amp;gt;/ после обработки; ничего не удаляется" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="560" y="1960" width="420" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="T2" value="&lt;b&gt;Обработка в шаблоне&lt;/b&gt;&lt;br&gt;SessionStart → nexus-update-check.py: «Nexus feedback inbox: N notes …» (при каждом старте);&lt;br&gt;feedback list | show | archive → правка шаблона (или decision при отказе) → новый релиз v*" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;spacing=4;fillColor=#fff2cc;strokeColor=#d6b656;align=left;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1960" width="440" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="u1" value="git fetch тегов (check / plan)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="T1" target="K1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="u2" value="git show файлов целевого тега" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="K1" target="U1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="u3" value="apply пишет baseline" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="U1" target="U2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="u4" value="отказ core-правки → повод для заметки" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#b85450;" edge="1" parent="1" source="U2" target="F1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="u5" value="feedback push (локальная копия + sidecar)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="F1" target="K2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="u6" value="feedback list / show" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="K2" target="T2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="u7" value="исправление → следующий релиз" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.5;" edge="1" parent="1" source="T2" target="T1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="u8" value="тот же файл" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;endArrow=block;endFill=1;strokeColor=#808080;dashed=1;exitX=0.25;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="S3" target="U2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1265" y="1575" />
+              <mxPoint x="1320" y="1575" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
