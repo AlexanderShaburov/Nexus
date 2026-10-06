@@ -63,7 +63,7 @@ It is written at the resolution it recommends: four document kinds, no new gate,
 | Why was it chosen? | `knowledge/decisions/` | why the gate accepts a Bash claim |
 | What is still unknown? | `knowledge/open-questions/` | should Nexus work at progressive resolution? |
 | What is this project, what counts as good, how do we validate, when is work done? | `process/charter.md` | an exploratory project; a level is done when its question has an answer |
-| Where are we now, what single question is being tested, what do we ignore for now? | `process/navigation.md` | Position: two files exist and are read at bootstrap |
+| Where are we now, what single question is being tested, why there and now, what do we ignore for now? | `process/navigation.md` | Position: two files exist and are read at bootstrap |
 | What is the road, coarsely? | `process/roadmap--*.md` | trace from a folder → mail → CRM |
 | What is the one-screen contract of the current step? | `process/iteration--*.md` | Trace v0 |
 
@@ -199,7 +199,7 @@ Each kind has a fixed set of H2 sections, in order, each present even when short
 
 ### `navigation.md`
 
-- `## Now` — three labelled lines, read by the runtime (§8): `Position:` where the project really is, as facts; `Heading:` the one question being tested, with a pointer to the `in_progress` iteration; `Ignoring:` what is deliberately out of scope at this level.
+- `## Now` — four labelled lines, read by the runtime (§8): `Position:` where the project really is, as facts; `Heading:` the one question being tested, with a pointer to the `in_progress` iteration; `Why here:` why this question now and not another, in terms of the charter's goal and the critical path, so that going deep here is distinguishable from burrowing; `Ignoring:` what is deliberately out of scope at this level. The `Why here` line was added on 2026-10-06 after the first cold reading of Nexus's own navigation: the agent stated the position correctly and could not say why the project worked there.
 - `## Horizon` — what is visible ahead but not elaborated, one line each.
 - `## Critical path` — the few things that must happen in order.
 - `## Uncertainty points` — what we may not know enough about, including whether the project is feasible as currently conceived.
@@ -243,7 +243,7 @@ Contract for the hooks; realization status in §10.
 
 1. **Session Bootstrap** (`SessionStart`, `PreCompact`): when `process/charter.md` exists, the Mandatory Startup Reading Set includes `process/charter.md`, `process/navigation.md`, and every `process/iteration--*.md` with `state: in_progress`. When `charter.md` is absent, bootstrap says so in one line and nothing else changes: a project without a charter is a project that has not decided what it is, which is allowed.
 2. **PreCompact** is the critical point: compaction loses position first. The full `navigation.md` returns there.
-3. **Per turn** (`UserPromptSubmit`): the three lines of `## Now` from `navigation.md`, verbatim, after the turn contract. Not the whole file: the cost repeats every turn.
+3. **Per turn** (`UserPromptSubmit`): the four lines of `## Now` from `navigation.md`, verbatim, after the turn contract. Not the whole file: the cost repeats every turn.
 4. **Staleness** (`SessionStart` only, advisory, one line): any `process/` document whose `review_by` has passed, and any `iteration` with `state: in_progress` whose `updated` is older than 14 days. The number is a first guess and is changed here when it proves wrong.
 5. **Validation** (`PostToolUse`, advisory, as for the vault): the rules of §4–§6 as a second rule set in `tools/validate-vault.py`, selected by the `process/` path, with codes `PR…`. The CLI validates both directories in one run.
 
