@@ -184,6 +184,8 @@ Meaning of each value:
 
 Each kind has a fixed set of H2 sections, in order, each present even when short. The whole document SHOULD fit on one screen; a charter section is one to three lines, not an essay. The constraint is the point: the moment a section wants to become a chapter, that chapter is knowledge and belongs in `knowledge/`.
 
+**Cold-readability rule.** A process document MUST be understandable to a reader who has only `charter.md` and the document itself: no session context, no memory of the conversation that produced it. In practice: name the current change and say which step of it has been reached, not only the landmarks around it; explain every tool, code or internal name in the same sentence or leave it out; write "ignoring" items as what they are, not as labels. The first navigation written for Nexus failed this test on its first review (landmarks without the change they belonged to, and four unexplained labels under *Ignoring*), which is why the rule is here.
+
 ### `charter.md`
 
 - `## Nature` — repeatable, exploratory, or mixed. Do we know how to do this at the start?
