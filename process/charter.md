@@ -16,7 +16,9 @@ Exploratory. One level is proven: project context now reaches every working step
 
 ## Goal
 
-A method and runtime that lets a person and an agent work on a project from its real position: grounded in what is known, aimed at what the project is for, elaborated no further than the current level demands. A good outcome is a host project whose agent, after bootstrap, can say where the project is and what single question it is testing, and is right.
+Nexus is a layer over Claude Code that guarantees the agent works, in every turn, with the project's current context. That context is of two kinds: **knowledge of the project** (decisions taken, constraints, relations, what is deprecated) and **management of the project** (goals, current position, horizon, the dynamics of its movement). Nexus does not do the operator's work: it keeps the account of the project and steers it, so that the operator is occupied with the questions that matter, where to go, by which methods, with which resources, rather than with restoring context.
+
+A good outcome: in any host project the agent, after bootstrap, knows what has been decided and what is deprecated, where the project is now and which single question is being tested, and acts within those bounds without being reminded.
 
 ## Validation policy
 
