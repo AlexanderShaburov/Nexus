@@ -88,6 +88,8 @@ Filenames are lowercase kebab-case. The two fixed files carry no suffix: there i
 
 No other kind is defined. A fifth kind is added by amending this spec when a document is written that fits none of the four, not before.
 
+Besides the four kinds, the directory holds one `README.md`: a few lines for a person opening the directory, naming the two fixed files and pointing here. It carries no frontmatter, is not a document kind, and the validator (§10) ignores it.
+
 ## 4. Frontmatter
 
 Every document in `process/` MUST begin with a YAML block. Two groups of fields answer two independent questions.
