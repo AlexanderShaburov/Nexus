@@ -3,7 +3,7 @@ type: question
 scope: system
 status: draft
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-06
 source_of_truth: false
 knowledge_visibility: development
 theme: progressive-resolution
@@ -22,7 +22,7 @@ tags: [method, progressive-resolution, navigation, iteration, parking-lot, open-
 
 # Open question: should Nexus work at progressive resolution?
 
-Parked by the operator on 2026-10-03. **Not to be worked on until the operator reopens it.** This note exists so the idea survives the session and can be picked up with its context intact.
+Parked by the operator on 2026-10-03. **Reopened by the operator on 2026-10-06.** The operational answer is being written as [Process Space Specification](../specs/spec--system--process-space.md) (draft): a `process/` directory beside the vault with `charter.md` and `navigation.md`. This note stays as the record of where the question came from; the sub-questions in §4 are answered there (who updates navigation: the agent at closure; where it lives: `process/`, outside the vault's `type` enum; the Planning Artifacts rule: bounded by the charter's horizon, spec §9).
 
 ## 1. Where the question comes from
 
