@@ -6,7 +6,7 @@ state: in_progress
 owner: agent
 horizon: near
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-08
 refs: [knowledge/specs/spec--system--process-space.md]
 ---
 
@@ -31,6 +31,8 @@ Status 2026-10-06, end of session: both runs are done (session archive `knowledg
 2. Read `process/navigation.md` cold: is it one screen, and are the position and the reason clear from it? The agent doubts the screen (56 lines, long Position line) and will shorten `## Now` if told so.
 
 One observation to classify then: the mechanism catches burrowing only past places that were named; naming the critical places is an act of the principle at net-writing time, not of any hook.
+
+Status 2026-10-08. The operator answered: question 1 has no answer yet and stays suspended; question 2: the navigation file is not readable cold. So the paper half of P5 holds and the readability half fails; P5 stays unmarked and this iteration stays open. The same day the operator restated the purpose of the second layer as joint, purposeful steering of the project by operator and agent, against burrowing and pseudo-precision, and chose to test steering as agent behaviour before any gate: an experimental `## Steering` section in `CLAUDE.md`, checked first in two dry scenario runs in the same session, then in ordinary sessions. Preliminary observations from the dry runs, with the agent aware it was being tested, so they prove nothing about durability: (1) on a request for a detailed universal net format the agent named the unchecked assumptions and offered continue / defer / change route; (2) on a doubt about the whole gate approach the agent named the touched milestones (P5, P7, T4) and the assumption of 2026-10-06 behind the gate, and proposed a route revision instead of defending the net. The operator judged both runs successful as behaviour and unproven as a mechanism. The net, P5, T4 and P7 are deliberately unchanged until the ordinary-session check; the position gate and the Mermaid view wait on it.
 
 ## We deliberately ignore
 

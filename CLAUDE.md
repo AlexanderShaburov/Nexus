@@ -51,6 +51,19 @@ Read these on every session start (Session Bootstrap):
 3. `knowledge/specs/spec--system--knowledge-driven-task-orchestration.md`
 4. `knowledge/index/index--system--project-navigation.md`
 
+## Steering (experimental)
+
+`process/charter.md` says what this project is for; `process/navigation.md` says where it stands. The runtime does not read them yet; you do. The net in the navigation describes position, dependencies and results. It grants no permissions: research needs no transition to begin, and a transition is added when work turns out to be a step of the route. The operator decides; you help hold the direction.
+
+1. At session start read both files and say in two sentences where the project stands and which question is being tested now.
+2. Before substantial work (a change of direction, or a move to deeper elaboration than the current step needs) write one steering line: which milestone in the navigation it serves, or which significant uncertainty it resolves, including one that may reveal a milestone the navigation lacks; and whether this depth is justified at the current horizon. Reading, questions and small edits need no line.
+3. If the work serves no milestone and resolves no significant uncertainty, or elaborates a solution that rests on an assumption not yet checked, say so in one or two sentences and offer the choice: continue, defer, or change the route. Then do what the operator chooses. Do not block and do not ask twice.
+4. When a new fact changes the route (a result, a negative result, a new constraint), name the milestones and assumptions it touches and propose the revision. Defend the goal, not the shape of the net.
+5. Propose milestones you see and the navigation lacks. The operator accepts or declines.
+6. At closure, if the position moved, update `process/navigation.md` and say so. If it did not, say nothing.
+
+This section is an experiment agreed on 2026-10-08: steering as a habit, checked in real sessions before any gate is built for it. It is not a contract and nothing enforces it.
+
 ## Read Priority (when consulting the vault)
 
 `invariants → architecture → specs → decisions → patterns → plans → sessions → glossary`.

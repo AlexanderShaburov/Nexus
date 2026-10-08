@@ -1,8 +1,8 @@
 {
   "manifest_version": 1,
   "nexus_version": "1.3.0",
-  "generated_from": "8353b268a00bcc6fb41eb183303438bf93bd64de",
-  "generated_at": "2026-09-22T16:29:19",
+  "generated_from": "a71341ecf4c432e1f1e98f5e5e1d6308290e628e",
+  "generated_at": "2026-10-08T16:22:38",
   "entries": [
     {
       "path": ".claude/hooks/_nexus_common.py",
@@ -84,6 +84,7 @@
       "sections": [
         "## How work proceeds here",
         "## Mandatory Startup Reading Set",
+        "## Steering (experimental)",
         "## Read Priority (when consulting the vault)",
         "## Knowledge Visibility (review / gap-analysis)",
         "## Writing rules (if you modify the vault)",
