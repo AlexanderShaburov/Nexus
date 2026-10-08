@@ -4,20 +4,20 @@ status: approved
 state: active
 owner: agent
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-08
 ---
 
 # Nexus navigation
 
 ## Now
 
-Position: Per the charter, Nexus has two layers of context. The first layer, knowledge of the project, is done: released as version 1.3.0 and running in several host projects (P1). The second layer, management of the project, is the current change, built in this repository only. Reached: the layer's rules exist as a draft specification (P2); the charter and this navigation exist and are agreed (P3). On 2026-10-06 the operator and the agent agreed the goal of the layer, coordinated movement toward the goal without burrowing and without stalling, and chose a net of project states and transitions as its carrier; this file now holds that net. The runtime does not read these files yet, and no host has them.
+Position: Nexus has two layers of context. Layer one, knowledge of the project, is shipped as 1.3.0 and runs in several host projects (P1). Layer two, management of the project, is built in this repository only: its rules are a draft specification (P2), the charter and this navigation are agreed (P3). On 2026-10-08 the operator restated what the layer is for: joint, purposeful steering of the project by operator and agent, against burrowing and premature detail. The paper test of the net (T2) has run. The net denies the arbitrage case and surfaces the Nexus case, so it is checkable on paper; but this file failed its cold reading, so P5 stays unmarked. Results: process/iteration--net-paper-test.md.
 
-Heading: T2, the paper test of the net: is a one-screen net structured enough for a mechanical check of which work is permitted now, while still reading cold? Contract: process/iteration--net-paper-test.md.
+Heading: does steering as agent behaviour hold the project's direction in ordinary work? An experimental Steering section in CLAUDE.md (2026-10-08) is checked by the operator in a fresh session, without announcing the check. This is a test of the agent, not of the net, so it is not a transition below; the net keeps T2 as its formal current step until the result says what P5 and the gate are for.
 
-Why here: T2 is critical and its feasibility is unknown. Every path to the release passes through P5: the runtime reading (T3) and the position gate (T4) both consume it. If a net cannot be both machine-checkable and one-screen readable, the layer does not work as conceived, and no hook would fix that. Checking it on paper is cheap; building hooks first would be work below an unproven critical transition.
+Why here: the layer exists for steering. Whether a habit is enough, or a gate is needed, decides the purpose of P5, T4 and P7, so it is the question everything downstream waits on. Testing the habit costs one session and no code; building the gate first would be work below an unverified assumption, that goodwill rots into ritual.
 
-Ignoring: T1, the cold-read check, is permitted too and stays open: its first run on 2026-10-06 gave "position right, reason absent", and the next run happens at the next session start without extra work. The runtime (T3), the gate (T4), hosts (T5) and release (T6) wait on P5. Anything concerning the hosts' own projects.
+Ignoring: the position gate (T4), a Mermaid view of the net, any change to P5 or to the shape of the net, until the steering check has a result. T1, the cold-read check, keeps running at each session start without extra work. Anything concerning the hosts' own projects.
 
 ## Net
 
@@ -51,6 +51,7 @@ Transitions (work; inputs → outputs; ! critical, ? feasibility unknown, ← no
 ## Validation points
 
 - Start of the next sessions (T1): the agent states position and reason from the two files alone; the operator judges. First run 2026-10-06: position right, reason absent; the file was amended.
-- Paper test (T2): the net denies the arbitrage case and surfaces the Nexus case; the operator reads the file cold and finds it one screen.
+- Paper test (T2): the net denies the arbitrage case and surfaces the Nexus case; the operator reads the file cold and finds it one screen. Run 2026-10-06/08: both cases as expected; cold reading failed. P5 not marked.
+- Steering check (2026-10-08): the operator runs a fresh session with an ordinary task and judges whether the agent names the milestone or uncertainty the work serves, notices premature depth or a route change, and offers the choice instead of blocking or complying silently.
 - After the runtime change (T3): the same check as T1, with no manual reading.
 - After the first host (T5): the host's operator can tell where their project is from its navigation alone.
