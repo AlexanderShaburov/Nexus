@@ -2,11 +2,11 @@
 type: iteration
 id: T2
 status: approved
-state: in_progress
+state: deferred
 owner: agent
 horizon: near
 created: 2026-10-06
-updated: 2026-10-08
+updated: 2026-10-09
 refs: [knowledge/specs/spec--system--process-space.md]
 ---
 
@@ -54,3 +54,7 @@ The net denies the arbitrage case, because an input place is unmarked; it surfac
 - Whether `--step none` is a hole wide enough to let burrowing through.
 - Whether the operator can keep a net of this shape current, or whether it rots like a plan.
 - Whether nine places and six transitions is already too many for one screen when a second track appears.
+
+## Deferred until
+
+Deferred on 2026-10-09, when the operator restated the purpose of the second layer as joint management of the project and returned the position gate to the status of a hypothesis (`knowledge/decisions/decision--system--second-layer-purpose.md`). The paper half of this test holds; the cold-readability half is now tested by the rewritten navigation at every session start (T1). This iteration resumes only if running the cycle in real work (T8) shows that steering as agent behaviour does not hold the direction without a gate; then it is the first step toward T4. Its open question 1 (`--step none` as a hole) stays suspended with it.
