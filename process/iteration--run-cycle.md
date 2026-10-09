@@ -1,8 +1,8 @@
 ---
 type: iteration
 id: T8
-status: review
-state: planned
+status: approved
+state: in_progress
 owner: agent
 horizon: near
 created: 2026-10-09
@@ -13,7 +13,9 @@ refs: [knowledge/specs/spec--system--process-space.md, knowledge/specs/spec--sys
 
 # Run the cycle once on real work
 
-Proposal of 2026-10-09, awaiting the operator's agreement (`status: review`). Nothing below has been started.
+Proposed and agreed 2026-10-09. The operator asked that two results be judged apart: the technical one (the documents are read automatically, position and objective restored) and the managerial one (the restored position is actually used to hold direction, choose actions, compare expected with obtained and decide the route together). Records of six steps are not proof of the cycle; the work done is. The revision branch is not to be forced: if the obtained result matches the expected one, keeping the route is a valid outcome of the revision.
+
+Status 2026-10-09, same session: the hook change is built (`_nexus_common.py` gains `process_documents()` and `required_files()`; the bootstrap hook lists the process documents and records them in the state; the tool gate's ledger and the prompt gate's reminder use the recorded set) and checked by piping against a copy of the repository: reading set with and without a charter, ledger pending until the process documents are read, reminder naming them, completion on the last read. Mirrors updated: bootstrap spec, rules §8 and §11, architecture, `CLAUDE.md`, validation plan (B2, B2a). The live check (fresh session; compaction) is the operator's and has not happened yet.
 
 ## Question
 
