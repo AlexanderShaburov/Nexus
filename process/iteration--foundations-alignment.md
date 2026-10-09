@@ -2,11 +2,12 @@
 type: iteration
 id: T7
 status: approved
-state: in_progress
+state: done
 owner: agent
 horizon: near
 created: 2026-10-09
 updated: 2026-10-09
+closed: 2026-10-09
 refs: [knowledge/decisions/decision--system--second-layer-purpose.md, knowledge/specs/spec--system--process-space.md]
 ---
 
@@ -40,6 +41,8 @@ The three documents and the decision record, committed; P10 marked in the net wi
 ## Success
 
 Operator and agent can both say that the five elements (goal, cycle, division of responsibility, planning rules, documents) are consistent and that no substantive contradiction remains. This does not show that the system of management works; running the cycle once in real work is the next transition (T8).
+
+Closed 2026-10-09. Expected: three documents rewritten and a decision record, one session, no code. Obtained: the same, plus one iteration contract (this file), the paper-test iteration deferred, and the stale Mermaid view deleted; three commits; the operator confirmed consistency in the same session. Deviation: none of substance. One thing the plan did not foresee: the net's grammar requires a contract on the current transition, so closing one step forces the next step's contract to exist at least as a draft; the cycle's step 4 therefore happens inside the closure of step 6, not after it.
 
 ## Unknowns to observe
 
