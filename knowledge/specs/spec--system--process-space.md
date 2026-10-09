@@ -327,12 +327,12 @@ For `tools/validate-vault.py`; codes reserved here so that the implementation an
 | this spec | draft; the purpose and the cycle (§0) were revised on 2026-10-09 with the charter; becomes `approved` after the full cycle has run once in real work |
 | `process/charter.md`, `process/navigation.md` for Nexus | written 2026-10-06; charter's Goal restated 2026-10-09; navigation's route redrawn from the new goal the same day |
 | the net's paper test (P5 in Nexus's own net) | deferred 2026-10-09 with the gate; paper half held, cold reading failed; contract `process/iteration--net-paper-test.md` |
-| alignment of the foundations with the new purpose | in progress 2026-10-09; contract `process/iteration--foundations-alignment.md` |
-| the full cycle run once in real work | in progress 2026-10-09; the critical transition of unknown feasibility; the work inside it is §8.1–8.2; contract `process/iteration--run-cycle.md` |
+| alignment of the foundations with the new purpose | done 2026-10-09, operator confirmed; contract `process/iteration--foundations-alignment.md` |
+| the full cycle run once in real work | done 2026-10-09; the work inside it was §8.1–8.2; technical result positive, managerial positive but limited (the agent's independence in management shown only in part); contract `process/iteration--run-cycle.md`. Found on the way: the net has no mark for a revision point between two transitions, while §6 demands exactly one `← now` |
 | agent behaviour (steps 2, 5, 6 of §0 in the turn) | experimental `## Steering` section in `CLAUDE.md`, 2026-10-08; a habit under test, not a contract; this spec gains a behavioural section only if the habit proves worth a contract |
 | position gate (§8.6) | deferred hypothesis; built only if the habit proves insufficient |
 | validator rule set `PR…` | pending; after the two files exist |
-| bootstrap and PreCompact reading (§8.1–8.2) | built 2026-10-09; checked by piping the hook (reading set, ledger, reminder); the live check in a fresh session and after compaction is the operator's |
+| bootstrap and PreCompact reading (§8.1–8.2) | built and checked live 2026-10-09: fresh session twice, compaction once; two defects found by the live check and fixed the same day (`PreCompact` cannot inject context; parallel reads raced on the ledger) |
 | per-turn `## Now` digest (§8.3) | pending |
 | staleness line (§8.4) | pending |
 | install templates for hosts (§2) | pending; after the Nexus files prove the shape |
