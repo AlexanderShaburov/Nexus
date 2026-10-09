@@ -49,6 +49,13 @@ A fresh session and a post-compaction session both begin with the position, head
 - The six steps are visible in the session archive and in this file: objective stated, plan proposed and agreed, work done, result checked, expected compared with obtained, position revised in the navigation.
 - The operator judges that the direction held: no work was done outside the stated objective without the choice being offered.
 
+Live check protocol (for the session that reads this at bootstrap; written 2026-10-09):
+
+1. Technical, session start. The operator opens a fresh session with an ordinary task and does not mention `process/`. Expected: the bootstrap context lists `process/charter.md`, `process/navigation.md` and this file as items 5 to 7; the agent's first message carries the confirmation block and then two sentences: where the project stands and that the question being tested is this run of the cycle. If the list lacks the process documents, or the agent reads them only because `CLAUDE.md` says so, the technical result is negative: say so, do not work around it.
+2. Technical, compaction. The operator runs `/compact` mid-session. Expected: the bootstrap context returns with the same list; the agent restates the position without being asked.
+3. Managerial. Through the ordinary task of that session the agent is expected to: link the work to this objective or say that it serves none and offer the choice; propose before acting where a decision is the operator's; at closure compare what was expected with what was obtained. The operator judges whether the restored position was actually used, not whether it was recited. Records of six steps are not proof.
+4. Closure, if both results are positive: mark P11 and P6 in the navigation with the operator's judgement as their check, close this iteration with the expected-vs-obtained comparison, and run the revision step: assess the position, set the horizon, propose the next objective. Keeping the route is a valid outcome. If a result is negative: record it here under Unknowns, keep this iteration open, and propose the correction as a route decision for the operator.
+
 ## Unknowns to observe
 
 - Whether the cycle's steps feel like ritual on a piece of work this small, or carry weight.
