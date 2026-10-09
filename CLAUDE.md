@@ -40,7 +40,7 @@ Alongside them, three **non-enforcing** hooks run:
 
 - `.claude/hooks/nexus-update-check.py` (`SessionStart` only) — in a project with a `.nexus/installed.json` baseline, asks the Nexus repository at most once a day, with one `git ls-remote` bounded to 5 s, whether a newer `v*` tag exists, and says so in one line if it does. Silent otherwise and silent on every failure. It never applies anything: updating is `python3 tools/nexus-update.py plan` then `apply --apply`, run by the operator from a plain terminal. In this template, where no baseline exists, the same hook instead reports how many feedback notes from host projects are waiting in the local mailbox (`python3 tools/nexus-update.py feedback list` to read them). Contracts: `knowledge/specs/spec--system--nexus-update.md` §7, `knowledge/specs/spec--system--feedback-channel.md` §4.
 
-Hook config: `.claude/settings.json`. Runtime state: `.nexus/state.json` (gitignored), plus the session-writer's markers `.nexus/session-theme.txt` and `.nexus/session-file.txt`.
+Hook config: `.claude/settings.json`. Runtime state: `.nexus/state.json` (gitignored; written atomically, and the tool gate locks `.nexus/state.lock` around it so parallel reads all reach the ledger), plus the session-writer's markers `.nexus/session-theme.txt` and `.nexus/session-file.txt`.
 
 ## Mandatory Startup Reading Set
 

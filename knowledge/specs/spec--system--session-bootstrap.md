@@ -110,6 +110,14 @@ and the reading set is the vault set alone. Contract:
 `.claude/hooks/nexus-bootstrap.py` and the read ledger of
 `nexus-tool-gate.py`.
 
+The ledger MUST record every read of a required file, including reads
+issued in parallel in one assistant message: Claude Code runs their
+`PreToolUse` hooks concurrently, so the tool gate serializes its
+read-modify-write of the session state under a lock and writes the
+state atomically. Found live 2026-10-09, when one of seven parallel
+bootstrap reads was lost and the prompt gate kept asking for a file the
+agent had read; fixed the same day.
+
 ------------------------------------------------------------------------
 
 ## STEP 3 — ACTIVE DESIGN TRACKS (advisory; required when performing review tasks)

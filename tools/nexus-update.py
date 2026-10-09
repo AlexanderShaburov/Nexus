@@ -76,6 +76,8 @@ BLOCKING_CLASSES = {"conflict", "unbaselined", "refused"}
 
 NEVER_TOUCH = [
     ".nexus/state*.json",
+    ".nexus/state.lock",
+    ".nexus/.state-*.json",
     ".nexus/session-theme.txt",
     ".nexus/session-file.txt",
     ".nexus/installed.json",
@@ -87,7 +89,7 @@ NEVER_TOUCH = [
     "knowledge/feedback/**",
 ]
 
-GITIGNORE_LINES = [".nexus/state*.json", ".nexus/backups/", ".nexus/update-check.json"]
+GITIGNORE_LINES = [".nexus/state*.json", ".nexus/state.lock", ".nexus/.state-*.json", ".nexus/backups/", ".nexus/update-check.json"]
 
 # H2 sections of the template's CLAUDE.md that describe the template itself,
 # not the protocol. Everything else in CLAUDE.md is Nexus-owned (plan §3.3).

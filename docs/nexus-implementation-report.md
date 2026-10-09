@@ -17,7 +17,7 @@ This document is the acceptance procedure for `.claude/hooks/`. Run it after **a
 | `nexus-session-writer.py` | `Stop` | Transcript archival to `knowledge/sessions/` | no (silent by design) |
 | `nexus-vault-validator.py` | `PostToolUse` | Advisory frontmatter validation of the document just written | no (advisory only) |
 | `nexus-update-check.py` | `SessionStart` | In a host with a baseline: throttled `ls-remote`, one line when a newer Nexus tag exists | no (silent by design) |
-| `_nexus_common.py` | — | Shared state I/O, transcript parsing, regexes | — |
+| `_nexus_common.py` | — | Shared state I/O (atomic write, `state_lock`), transcript parsing, regexes | — |
 | `tools/validate-vault.py` | — | Vault rule set + CLI; the validator hook is a thin adapter over it | — |
 | `tools/nexus-decide.py` | — | Context Decision **claim** (Form A): validates and prints the decision; the tool gate recognises the call from `tool_input.command` via the shared parser in `_nexus_common.py` | — |
 
@@ -67,9 +67,23 @@ python3 tools/validate-vault.py
 # S8 — the ownership manifest matches the tree, and the updater's rules still hold
 python3 tools/nexus-update.py manifest verify
 python3 tools/nexus-update.py --selftest
+
+# S9 — parallel reads all reach the ledger (the tool gate's read-modify-write is locked)
+# Run against a COPY of the repo: the bootstrap hook resets the live session's state.
+R=$(mktemp -d)/repo && mkdir -p "$R" && tar --exclude=.git --exclude=.nexus -cf - . | (cd "$R" && tar -xf -)
+export CLAUDE_PROJECT_DIR="$R"
+FILES=$(python3 -c "import sys; sys.path.insert(0,'.claude/hooks'); import _nexus_common as c; print(' '.join(c.REQUIRED_FILES + c.process_documents()))")
+for i in $(seq 1 20); do
+  echo '{"hook_event_name":"SessionStart","session_id":"s9"}' | python3 "$R/.claude/hooks/nexus-bootstrap.py" >/dev/null
+  for f in $FILES knowledge/invariants/invariant--system--lifecycle-gates.md; do
+    printf '{"tool_name":"Read","tool_input":{"file_path":"%s/%s"}}' "$R" "$f" | python3 "$R/.claude/hooks/nexus-tool-gate.py" >/dev/null &
+  done; wait
+  python3 -c "import json; s=json.load(open('$R/.nexus/state.json'))['bootstrap']; print(s['status'], len(s['read_ledger']), len(s['required_files']))"
+done | sort | uniq -c
+unset CLAUDE_PROJECT_DIR
 ```
 
-Expected: S1 all `OK`; S2 no output; S3 `MISSING: none` and eight registrations (`SessionStart`×2, `PreCompact`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`×2); S4 prints `0` twice; S5 all fixtures pass; S6 `0 error(s)` and exit 0; S8 `in sync with the tree` and `all checks passed`.
+Expected: S1 all `OK`; S2 no output; S3 `MISSING: none` and eight registrations (`SessionStart`×2, `PreCompact`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`×2); S4 prints `0` twice; S5 all fixtures pass; S6 `0 error(s)` and exit 0; S8 `in sync with the tree` and `all checks passed`; S9 one line, `20 completed N N` with N the size of the reading set (6 in this repository), never `pending` and never a JSON error. Before the lock (2026-10-09) the same run lost entries in 20 of 20 rounds and left `state.json` torn in 4.
 
 S8 fails whenever a hook, a `tools/*.py` file, a binding system document or an H2 heading of `CLAUDE.md` is added, removed or renamed without regenerating the manifest: run `python3 tools/nexus-update.py manifest generate` and commit `nexus.manifest.json` with the change. Bump `nexus.version` on release, then regenerate.
 
@@ -170,7 +184,7 @@ These cannot be scripted; they require a real Claude Code session. Perform them 
 | # | Action | Expected observable result |
 |---|---|---|
 | B1 | Start a fresh session; before reading anything, attempt `Bash(ls)` | Denied with `NEXUS BOOTSTRAP PENDING` |
-| B2 | Read the four Mandatory Startup files (incl. ≥1 invariant), plus `process/charter.md`, `process/navigation.md` and every `process/iteration--*.md` in `state: in_progress` when a charter exists | `.nexus/state.json` → `bootstrap.status: completed`, `read_ledger` covers `bootstrap.required_files` (3 vault entries + the process documents), `invariant_read_count ≥ 1`. Before the process documents are read the status stays `pending` and the prompt gate's *Still to read* names them |
+| B2 | Read the four Mandatory Startup files (incl. ≥1 invariant), plus `process/charter.md`, `process/navigation.md` and every `process/iteration--*.md` in `state: in_progress` when a charter exists | `.nexus/state.json` → `bootstrap.status: completed`, `read_ledger` covers `bootstrap.required_files` (3 vault entries + the process documents), `invariant_read_count ≥ 1`. Before the process documents are read the status stays `pending` and the prompt gate's *Still to read* names them. Issue the reads as **one parallel batch**: every one must land in the ledger (S9 is the scripted form) |
 | B2a | Pipe `{"hook_event_name":"SessionStart"}` into `nexus-bootstrap.py` with `CLAUDE_PROJECT_DIR` set to a **copy** of the repo (never the working tree: the hook resets the live session's state): (a) with `process/charter.md`; (b) with the charter removed | (a) STEP 1 lists the charter, the navigation and the in-progress iterations as items 5 and following, asks for the two-sentence position statement, and `state.json` `required_files` carries them; (b) one line `No process/charter.md: ... the second layer is not active` and `required_files` has 3 entries. With `{"hook_event_name":"SessionStart","source":"compact"}` the same, and the `Event:` line names the source. With `{"hook_event_name":"PreCompact","trigger":"manual"}`: exit 0, **no stdout** (the installed Claude Code rejects `hookSpecificOutput` for PreCompact; the live check of 2026-10-09 reported the hook as failed), and `state.json` reset to `pending` with the same `required_files` |
 | B3 | Attempt `Bash(ls)` with no Context Decision in the turn | Denied with `NEXUS DECISION GATE MISSING` |
 | B4 | Emit a Context Decision block, then attempt `Bash(ls)` | Allowed; `state.json` → `turn.decision_gate_seen: true`, `turn.decision.via: "text"`. If denied, see the narration note below before calling it a regression |

@@ -36,11 +36,20 @@ from _nexus_common import (  # noqa: E402
     relpath_from_project,
     required_files,
     save_state,
+    state_lock,
 )
 
 
 def main() -> int:
     inp = read_hook_input()
+    # One PreToolUse per parallel tool call, all at once: the read ledger and the
+    # per-turn decision are read-modify-write on the same file, so the whole
+    # gate runs under the state lock (see _nexus_common.state_lock).
+    with state_lock():
+        return _gate(inp)
+
+
+def _gate(inp) -> int:
     tool = inp.get("tool_name") or ""
     tool_input = inp.get("tool_input") or {}
     transcript_path = inp.get("transcript_path") or ""

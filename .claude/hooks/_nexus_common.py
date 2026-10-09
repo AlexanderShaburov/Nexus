@@ -6,12 +6,14 @@ Not a public API — consumed only by the .py wrappers in this directory.
 
 from __future__ import annotations
 
+import contextlib
 import datetime
 import json
 import os
 import pathlib
 import re
 import sys
+import tempfile
 import time
 from typing import Any, Callable
 
@@ -84,9 +86,54 @@ def load_state() -> dict[str, Any]:
 
 
 def save_state(state: dict[str, Any]) -> None:
+    """Write state atomically: a reader never sees a truncated or interleaved file.
+
+    `Path.write_text` truncates and then writes; two hooks writing at once
+    (Claude Code runs the PreToolUse hooks of parallel tool calls
+    concurrently) leave a file that is one writer's text with the other's
+    tail, which `load_state` reads as `{}` and the tool gate then fails
+    open. Write to a sibling temp file and rename over the target instead.
+    """
     p = state_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(state, indent=2))
+    fd, tmp = tempfile.mkstemp(prefix=".state-", suffix=".json", dir=str(p.parent))
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(json.dumps(state, indent=2))
+        os.replace(tmp, p)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+@contextlib.contextmanager
+def state_lock():
+    """Hold an exclusive lock on `.nexus/state.lock` for a read-modify-write of the state.
+
+    Hooks run as separate processes, and parallel tool calls run their
+    PreToolUse hooks at the same time. Without the lock each hook loads the
+    same state, appends its own entry and saves, and the last writer wins:
+    reads of required files vanish from the ledger (seen live 2026-10-09).
+    `fcntl.flock` is advisory and released when the process exits, so a
+    killed hook cannot leave the lock held. Where `fcntl` is unavailable the
+    lock is a no-op and the behaviour is the pre-fix one.
+    """
+    try:
+        import fcntl
+    except ImportError:  # not POSIX
+        yield
+        return
+    lock_path = state_path().with_name("state.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "a") as lf:
+        fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
 
 
 def process_documents() -> list[str]:

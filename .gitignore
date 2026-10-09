@@ -1,6 +1,9 @@
 # Nexus runtime state (regenerated per session)
 # Glob, not a literal: catches macOS/iCloud duplicates like ".nexus/state 2.json"
 .nexus/state*.json
+# The tool gate's lock and the atomic-write temp files beside state.json
+.nexus/state.lock
+.nexus/.state-*.json
 
 # Nexus patch backups (regenerated per patch apply)
 .nexus/backups/

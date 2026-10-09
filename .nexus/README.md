@@ -8,7 +8,9 @@ This directory holds ephemeral per-session state for the Nexus enforcement hooks
 
 Contents:
 
-- `state.json` — per-session runtime: bootstrap status, read-ledger, turn index, decision-gate flag.
+- `state.json` — per-session runtime: bootstrap status, read-ledger, turn index, decision-gate flag. Written atomically (temp file + rename).
+
+- `state.lock` — the lock the tool gate holds while it reads and rewrites `state.json`; the PreToolUse hooks of parallel tool calls run at the same time. Empty, harmless, gitignored.
 
   
 
