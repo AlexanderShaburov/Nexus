@@ -22,6 +22,14 @@ REQUIRED_FILES = [
 ]
 REQUIRED_INVARIANTS_DIR = "knowledge/invariants"
 
+# Process space (spec--system--process-space.md §8.1): when the project has a
+# charter, bootstrap also reads the charter, the navigation and every iteration
+# in progress, so the position survives session start and compaction.
+PROCESS_DIR = "process"
+PROCESS_CHARTER = "process/charter.md"
+PROCESS_NAVIGATION = "process/navigation.md"
+_FRONTMATTER_STATE_RE = re.compile(r"(?m)^state:\s*([A-Za-z_]+)\s*$")
+
 # Tools allowed while bootstrap is pending (read-only vault traversal).
 READ_ONLY_TOOLS = {"Read", "Glob", "Grep", "LS", "NotebookRead", "TodoWrite", "TaskList", "TaskGet", "TaskOutput"}
 
@@ -81,13 +89,56 @@ def save_state(state: dict[str, Any]) -> None:
     p.write_text(json.dumps(state, indent=2))
 
 
+def process_documents() -> list[str]:
+    """Process documents in the Mandatory Startup Reading Set.
+
+    Empty when `process/charter.md` is absent: a project without a charter has
+    not decided what it is, and the second layer is not active there. Otherwise
+    the charter, the navigation (if present) and every `iteration--*.md` whose
+    frontmatter says `state: in_progress`, in that order.
+    """
+    root = project_dir()
+    if not (root / PROCESS_CHARTER).is_file():
+        return []
+    docs = [PROCESS_CHARTER]
+    if (root / PROCESS_NAVIGATION).is_file():
+        docs.append(PROCESS_NAVIGATION)
+    for p in sorted((root / PROCESS_DIR).glob("iteration--*.md")):
+        if p.is_file() and _frontmatter_state(p) == "in_progress":
+            docs.append(f"{PROCESS_DIR}/{p.name}")
+    return docs
+
+
+def _frontmatter_state(path: pathlib.Path) -> str:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    if not text.startswith("---"):
+        return ""
+    end = text.find("\n---", 3)
+    if end < 0:
+        return ""
+    m = _FRONTMATTER_STATE_RE.search(text[3:end])
+    return m.group(1) if m else ""
+
+
+def required_files(state: dict[str, Any] | None = None) -> list[str]:
+    """The files the read ledger must cover: the vault set plus the process documents recorded at session start."""
+    if state:
+        recorded = state.get("bootstrap", {}).get("required_files")
+        if isinstance(recorded, list) and recorded:
+            return list(recorded)
+    return REQUIRED_FILES + process_documents()
+
+
 def fresh_state(session_id: str) -> dict[str, Any]:
     return {
         "session_id": session_id,
         "started_at": datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
         "bootstrap": {
             "status": "pending",
-            "required_files": REQUIRED_FILES,
+            "required_files": REQUIRED_FILES + process_documents(),
             "required_invariants_dir": REQUIRED_INVARIANTS_DIR,
             "read_ledger": [],
             "invariant_read_count": 0,

@@ -22,7 +22,6 @@ from _nexus_common import (  # noqa: E402
     DECISION_CLAIM_USAGE,
     MUTATING_TOOLS,
     READ_ONLY_TOOLS,
-    REQUIRED_FILES,
     REQUIRED_INVARIANTS_DIR,
     bootstrap_complete,
     core_freeze_reason,
@@ -35,6 +34,7 @@ from _nexus_common import (  # noqa: E402
     read_hook_input,
     read_transcript_current_turn,
     relpath_from_project,
+    required_files,
     save_state,
 )
 
@@ -60,7 +60,7 @@ def main() -> int:
                 file_path = tool_input.get("file_path") or ""
                 rel = relpath_from_project(file_path)
                 ledger = bs.setdefault("read_ledger", [])
-                if rel in REQUIRED_FILES and rel not in ledger:
+                if rel in required_files(state) and rel not in ledger:
                     ledger.append(rel)
                 if rel.startswith(REQUIRED_INVARIANTS_DIR + "/") and rel.endswith(".md"):
                     bs["invariant_read_count"] = int(bs.get("invariant_read_count", 0)) + 1
@@ -81,7 +81,8 @@ def main() -> int:
         reason = (
             f"NEXUS BOOTSTRAP PENDING: tool '{tool}' is BLOCKED. "
             "Finish Session Bootstrap first: read the Mandatory Startup Reading Set "
-            "(invariants + architecture + orchestration spec + navigation index), "
+            "(invariants + architecture + orchestration spec + navigation index, "
+            "plus process/charter.md, process/navigation.md and the iterations in progress when a charter exists), "
             "then emit the 'Session Bootstrap Completed' confirmation block. "
             "Read-only tools (Read/Glob/Grep/LS/NotebookRead) remain permitted."
         )

@@ -9,13 +9,14 @@ tags:
 - bootstrap
 - session
 type: spec
-updated: 2026-06-04
+updated: 2026-10-09
 ---
 
 ## Relations
 
 - depends_on:
   - [Knowledge-Driven Task Orchestration Specification](spec--system--knowledge-driven-task-orchestration.md) — bootstrap is the entry mechanism for the Retrieve obligation.
+  - [Process Space Specification](spec--system--process-space.md) — §8.1–8.2 define the project-position documents that join the reading set when a charter exists.
 - relates_to:
   - [Lifecycle Gates Invariant](../invariants/invariant--system--lifecycle-gates.md) — bootstrap is the first non-negotiable gate.
   - [Overall Structure (Nexus System)](../architecture/architecture--system--overall-structure.md) — bootstrap is realized by the SessionStart hook described there.
@@ -86,6 +87,23 @@ It executes exactly once per session.
 -   knowledge/invariants/
 
 All invariants MUST be treated as non-negotiable constraints.
+
+### Project Position (when `process/charter.md` exists)
+
+-   process/charter.md
+-   process/navigation.md
+-   every process/iteration--\*.md whose frontmatter says `state: in_progress`
+
+These are read after the vault set, at session start and again after
+compaction, and the read ledger must cover them before bootstrap is
+complete. After the confirmation block the agent says in two sentences
+where the project stands and which question is being tested now. When
+`process/charter.md` is absent, bootstrap says so in one line (*this
+project has not decided what it is; the second layer is not active*)
+and the reading set is the vault set alone. Contract:
+`spec--system--process-space.md` §8.1–8.2; realized 2026-10-09 in
+`.claude/hooks/nexus-bootstrap.py` and the read ledger of
+`nexus-tool-gate.py`.
 
 ------------------------------------------------------------------------
 

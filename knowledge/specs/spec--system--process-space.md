@@ -273,8 +273,8 @@ The writeback evaluation that the Exit Gate already requires gains one question:
 
 Contract for the hooks; realization status in §10.
 
-1. **Session Bootstrap** (`SessionStart`, `PreCompact`): when `process/charter.md` exists, the Mandatory Startup Reading Set includes `process/charter.md`, `process/navigation.md`, and every `process/iteration--*.md` with `state: in_progress`. When `charter.md` is absent, bootstrap says so in one line and nothing else changes: a project without a charter is a project that has not decided what it is, which is allowed.
-2. **PreCompact** is the critical point: compaction loses position first. The full `navigation.md` returns there.
+1. **Session Bootstrap** (`SessionStart`, `PreCompact`): when `process/charter.md` exists, the Mandatory Startup Reading Set includes `process/charter.md`, `process/navigation.md`, and every `process/iteration--*.md` with `state: in_progress`. When `charter.md` is absent, bootstrap says so in one line and nothing else changes: a project without a charter is a project that has not decided what it is, which is allowed. *Realized 2026-10-09*: `nexus-bootstrap.py` lists the documents as items 5 and following of STEP 1 and records them in the session state's `required_files`; the tool gate's read ledger must cover them before bootstrap completes; the prompt gate names the unread ones; after the confirmation block the agent states the position in two sentences. Mirrored in `spec--system--session-bootstrap.md`.
+2. **PreCompact** is the critical point: compaction loses position first. The full `navigation.md` returns there. *Realized 2026-10-09* by the same mechanism: the bootstrap hook runs on both events.
 3. **Per turn** (`UserPromptSubmit`): the four lines of `## Now` from `navigation.md`, verbatim, after the turn contract. Not the whole file: the cost repeats every turn.
 4. **Staleness** (`SessionStart` only, advisory, one line): any `process/` document whose `review_by` has passed, and any `iteration` with `state: in_progress` whose `updated` is older than 14 days. The number is a first guess and is changed here when it proves wrong.
 5. **Validation** (`PostToolUse`, advisory, as for the vault): the rules of §4–§6 as a second rule set in `tools/validate-vault.py`, selected by the `process/` path, with codes `PR…`. The CLI validates both directories in one run.
@@ -328,11 +328,11 @@ For `tools/validate-vault.py`; codes reserved here so that the implementation an
 | `process/charter.md`, `process/navigation.md` for Nexus | written 2026-10-06; charter's Goal restated 2026-10-09; navigation's route redrawn from the new goal the same day |
 | the net's paper test (P5 in Nexus's own net) | deferred 2026-10-09 with the gate; paper half held, cold reading failed; contract `process/iteration--net-paper-test.md` |
 | alignment of the foundations with the new purpose | in progress 2026-10-09; contract `process/iteration--foundations-alignment.md` |
-| the full cycle run once in real work | next; the critical transition of unknown feasibility |
+| the full cycle run once in real work | in progress 2026-10-09; the critical transition of unknown feasibility; the work inside it is §8.1–8.2; contract `process/iteration--run-cycle.md` |
 | agent behaviour (steps 2, 5, 6 of §0 in the turn) | experimental `## Steering` section in `CLAUDE.md`, 2026-10-08; a habit under test, not a contract; this spec gains a behavioural section only if the habit proves worth a contract |
 | position gate (§8.6) | deferred hypothesis; built only if the habit proves insufficient |
 | validator rule set `PR…` | pending; after the two files exist |
-| bootstrap and PreCompact reading (§8.1–8.2) | pending |
+| bootstrap and PreCompact reading (§8.1–8.2) | built 2026-10-09; checked by piping the hook (reading set, ledger, reminder); the live check in a fresh session and after compaction is the operator's |
 | per-turn `## Now` digest (§8.3) | pending |
 | staleness line (§8.4) | pending |
 | install templates for hosts (§2) | pending; after the Nexus files prove the shape |

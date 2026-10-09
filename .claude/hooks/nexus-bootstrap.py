@@ -11,11 +11,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from _nexus_common import (  # noqa: E402
+    PROCESS_CHARTER,
     REQUIRED_FILES,
     REQUIRED_INVARIANTS_DIR,
     emit_context,
     fresh_state,
     invariants_present,
+    process_documents,
     project_dir,
     read_hook_input,
     save_state,
@@ -35,6 +37,7 @@ def main() -> int:
     missing = [p for p in REQUIRED_FILES if not (root / p).is_file()]
     invariants = invariants_present()
     invariant_missing = len(invariants) == 0
+    process_docs = process_documents()
 
     lines = [
         "=== NEXUS SESSION BOOTSTRAP — MANDATORY ===",
@@ -47,6 +50,22 @@ def main() -> int:
         f"  2. {REQUIRED_FILES[2]}",
         f"  3. {REQUIRED_FILES[1]}",
         f"  4. {REQUIRED_FILES[0]}",
+    ]
+    if process_docs:
+        # spec--system--process-space.md §8.1–8.2: the project's position is part
+        # of the reading set, at session start and again after compaction.
+        lines += [f"  {5 + i}. {p}" for i, p in enumerate(process_docs)]
+        lines += [
+            "     (project position: charter, navigation, iteration(s) in progress;",
+            "      spec--system--process-space.md §8). After the confirmation block, say in",
+            "      two sentences where the project stands and which question is being tested now.)",
+        ]
+    else:
+        lines += [
+            "",
+            f"No {PROCESS_CHARTER}: this project has not decided what it is; the second layer is not active.",
+        ]
+    lines += [
         "",
         "STEP 2 — Emit this exact confirmation block as plain text:",
         "",
@@ -99,6 +118,7 @@ def main() -> int:
         "SOURCE SPECS (ground truth for this protocol):",
         "  knowledge/specs/spec--system--session-bootstrap.md",
         "  knowledge/specs/spec--system--knowledge-driven-task-orchestration.md",
+        "  knowledge/specs/spec--system--process-space.md §8 (project position)",
     ]
     if missing:
         lines += ["", "WARNING — these required vault files are MISSING:"]

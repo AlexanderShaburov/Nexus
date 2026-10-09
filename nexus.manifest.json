@@ -1,8 +1,8 @@
 {
   "manifest_version": 1,
   "nexus_version": "1.3.0",
-  "generated_from": "a71341ecf4c432e1f1e98f5e5e1d6308290e628e",
-  "generated_at": "2026-10-08T16:22:38",
+  "generated_from": "3d4f98edbef1a53da73512ddf2f2c66ffb26d6e1",
+  "generated_at": "2026-10-09T13:33:14",
   "entries": [
     {
       "path": ".claude/hooks/_nexus_common.py",
@@ -123,6 +123,11 @@
     },
     {
       "path": "knowledge/decisions/decision--system--development-visibility-failure.md",
+      "strategy": "replace",
+      "group": "vault"
+    },
+    {
+      "path": "knowledge/decisions/decision--system--second-layer-purpose.md",
       "strategy": "replace",
       "group": "vault"
     },

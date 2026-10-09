@@ -3,7 +3,7 @@ type: architecture
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-09-22
+updated: 2026-10-09
 source_of_truth: true
 knowledge_visibility: binding
 tags: [architecture, system, nexus, lifecycle, self-update]
@@ -50,7 +50,7 @@ Directories by role:
 
 Shell + Python scripts invoked by Claude Code at lifecycle events. They read and mutate `.nexus/state.json` and inject `additionalContext` / `decision: block` JSON to steer the agent.
 
-- `nexus-bootstrap.py` — runs on `SessionStart` and `PreCompact`. Resets state, injects the Mandatory Startup Reading Set.
+- `nexus-bootstrap.py` — runs on `SessionStart` and `PreCompact`. Resets state, injects the Mandatory Startup Reading Set. When `process/charter.md` exists, the set also carries the project position: the charter, `process/navigation.md` and every `process/iteration--*.md` with `state: in_progress` (spec `spec--system--process-space.md` §8.1–8.2); these are recorded in the state's `required_files`, so the read ledger must cover them too. Without a charter the hook says so in one line.
 - `nexus-prompt-gate.py` — runs on `UserPromptSubmit`. Resets per-turn state and injects Decision Gate + Exit Gate reminders. Hard-blocks prompts while bootstrap is pending unless the prompt is a read-only KB query.
 - `nexus-tool-gate.py` — runs on `PreToolUse`. While bootstrap pending, only read-only tools (`Read`/`Glob`/`Grep`/`LS`/`NotebookRead`) are allowed, on any path — reads cannot mutate, so the gate constrains tool class, not location. Tracks read-ledger to auto-complete bootstrap. After bootstrap, non-read tools require a Decision Gate statement in the current turn, accepted in two forms checked in order: the per-turn flag already set; a **claim** (`python3 tools/nexus-decide.py ...`) read from `tool_input.command`; the `### Context Decision` text block read from the transcript. A malformed claim is denied with the defect named. In a host with a baseline (`.nexus/installed.json`), the editing tools are denied on a Nexus core path (every `replace` unit) unless `.nexus/unlock.txt` lists it; this **core freeze** is checked after the bootstrap gate and before the decision check, and is inactive in the template (spec `spec--system--nexus-update.md` §6).
 - `nexus-exit-gate.py` — runs on `Stop`. Parses transcript, validates Closure Block presence + field shape + dependency rules. Blocks completion with a `reason` on violation.
@@ -120,7 +120,8 @@ Hosts do not edit the Nexus core (§2 tool gate), so observations about Nexus tr
 ```
 SessionStart / PreCompact
   ├─> nexus-bootstrap.py
-  │     ├─ reset .nexus/state.json (bootstrap = pending)
+  │     ├─ reset .nexus/state.json (bootstrap = pending; required_files = vault set
+  │     │    + process/charter.md, navigation.md, iterations in progress when a charter exists)
   │     └─ inject mandatory reading set into first turn context
   └─> nexus-update-check.py   (SessionStart only; non-enforcing, silent)
         ├─ no .nexus/installed.json → template? report the feedback inbox count; else exit
@@ -177,7 +178,7 @@ Stop
   "started_at": "ISO8601",
   "bootstrap": {
     "status": "pending | completed",
-    "required_files": ["knowledge/index/...", "knowledge/specs/...", "knowledge/architecture/..."],
+    "required_files": ["knowledge/index/...", "knowledge/specs/...", "knowledge/architecture/...", "process/charter.md", "process/navigation.md", "process/iteration--<in progress>.md"],
     "required_invariants_dir": "knowledge/invariants",
     "read_ledger": ["..."]
   },

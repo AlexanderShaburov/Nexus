@@ -11,13 +11,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from _nexus_common import (  # noqa: E402
-    REQUIRED_FILES,
     REQUIRED_INVARIANTS_DIR,
     bootstrap_complete,
     emit_context,
     fresh_state,
     load_state,
     read_hook_input,
+    required_files,
     save_state,
 )
 
@@ -76,7 +76,7 @@ def main() -> int:
     if not bootstrap_complete(state):
         bs = state.get("bootstrap", {})
         read = set(bs.get("read_ledger", []))
-        still_needed = [p for p in REQUIRED_FILES if p not in read]
+        still_needed = [p for p in required_files(state) if p not in read]
         lines = [
             "=== NEXUS BOOTSTRAP STILL PENDING ===",
             "",
