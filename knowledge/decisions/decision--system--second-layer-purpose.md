@@ -12,8 +12,8 @@ tags: [decision, governance, process-space, second-layer, steering, charter]
 ## Relations
 
 - relates_to:
-  - [Process Space Specification](../specs/spec--system--process-space.md) — the draft rules of the second layer; amended by this decision (management cycle, warning instead of refusal, gate deferred).
-  - [Open question: progressive resolution](../open-questions/question--system--progressive-resolution.md) — the origin of the second layer.
+  - [Process Space Specification](../specs/spec--system--process-space.md) — the rules of the second layer (approved 2026-10-09); amended by this decision (management cycle, warning instead of refusal, gate deferred).
+  - `open-questions/question--system--progressive-resolution.md` (development class, not delivered to hosts; cited by path, not linked) — the origin of the second layer.
   - [Knowledge-Driven Task Orchestration Specification](../specs/spec--system--knowledge-driven-task-orchestration.md) — the first layer's contract, which this decision leaves unchanged.
 
 ---

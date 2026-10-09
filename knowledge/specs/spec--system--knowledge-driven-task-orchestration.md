@@ -3,7 +3,7 @@ type: spec
 scope: system
 status: approved
 created: 2026-04-17
-updated: 2026-09-22
+updated: 2026-10-09
 source_of_truth: true
 knowledge_visibility: binding
 tags: [knowledge, orchestration, plan-status]
@@ -180,6 +180,8 @@ If the response already contains:
 
 → this qualifies as a plan
 → MUST be externalized
+
+In a project with a charter (`process/charter.md`), this rule is bounded by the charter's planning horizon: a plan covers at most the current iteration; structured thoughts about later levels go to the roadmap as one line each, not to `plans/` (`spec--system--process-space.md` §9).
 
 Claude SHOULD create or update a plan when:
 

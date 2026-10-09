@@ -1,11 +1,11 @@
 ---
 type: spec
 scope: system
-status: draft
+status: approved
 created: 2026-10-06
 updated: 2026-10-09
-source_of_truth: false
-knowledge_visibility: development
+source_of_truth: true
+knowledge_visibility: binding
 theme: progressive-resolution
 governs: [process/]
 tags: [spec, process-space, charter, navigation, iteration, progressive-resolution, frontmatter]
@@ -17,11 +17,11 @@ tags: [spec, process-space, charter, navigation, iteration, progressive-resoluti
   - [Document Frontmatter Specification](spec--system--document-frontmatter.md) — the `status` enum and the date rules are reused unchanged; the field set here is a separate contract for a separate directory.
   - [Knowledge Vault Specification](spec--system--knowledge-vault.md) — defines what `knowledge/` is; this spec defines what it is not, and where that goes instead.
 - constrains:
-  - [Session Bootstrap Specification](spec--system--session-bootstrap.md) — once this spec is approved, the Mandatory Startup Reading Set grows by the process documents named in §7.
+  - [Session Bootstrap Specification](spec--system--session-bootstrap.md) — the Mandatory Startup Reading Set grows by the process documents named in §8 (realized 2026-10-09).
   - [Knowledge-Driven Task Orchestration Specification](spec--system--knowledge-driven-task-orchestration.md) — §8 bounds the Planning Artifacts rule by the charter's planning horizon.
 - relates_to:
   - [Decision: What the second layer of Nexus is for](../decisions/decision--system--second-layer-purpose.md) — the 2026-10-09 revision of the purpose: joint management, the cycle, the gate deferred.
-  - [Open question: progressive resolution](../open-questions/question--system--progressive-resolution.md) — the origin; reopened on 2026-10-06 by this spec.
+  - `open-questions/question--system--progressive-resolution.md` (development class, not delivered to hosts; cited by path, not linked) — the origin; reopened on 2026-10-06 by this spec.
   - [Nexus Update Specification](spec--system--nexus-update.md) — `process/` is project-owned, never a Nexus-owned unit (§2).
   - [Knowledge Visibility Specification](spec--system--knowledge-visibility.md) — `state` plays in `process/` the role `knowledge_visibility` plays in the vault; the two never appear together.
 
@@ -295,7 +295,7 @@ This is the lever the rest exists for. It rests on a principle agreed on 2026-10
 
 The agent reads the charter's planning horizon and the iteration's `horizon` before elaborating anything. When the work asked for, or the work it is about to do, goes beyond them, it does not refuse and does not comply silently: it says so, explains the risk of premature detail (precision that rests on an unchecked assumption, and the work that will be redone when the assumption falls), proposes the scale that fits the horizon, and offers the choice: continue, defer, or change the route. The operator chooses, knowingly, and the agent does what was chosen. The default proposal is *one line in the roadmap or in open-questions now, elaboration when reality has produced a need for it*; the line is kept, so nothing is lost. The first version of this rule (2026-10-06) made the refusal explicit and mandatory; the revision of 2026-10-09 replaced it by warning and the operator's choice, because research needs no permission to begin and a change of direction is a management decision, not a violation.
 
-**Amendment to the Planning Artifacts rule.** `spec--system--knowledge-driven-task-orchestration.md` requires a structured multi-step answer to be externalized as a plan. In a project with a charter, that rule is bounded: a plan covers at most the current iteration (`horizon: near`). Structured thoughts about later levels go to the roadmap as one line each, not to `plans/`. When this spec is approved, the orchestration spec is amended to say so.
+**Amendment to the Planning Artifacts rule.** `spec--system--knowledge-driven-task-orchestration.md` requires a structured multi-step answer to be externalized as a plan. In a project with a charter, that rule is bounded: a plan covers at most the current iteration (`horizon: near`). Structured thoughts about later levels go to the roadmap as one line each, not to `plans/`. The orchestration spec says so since the approval of this spec on 2026-10-09 (one sentence in its Planning Artifacts section).
 
 ## 10. Validation rules
 
@@ -324,7 +324,7 @@ For `tools/validate-vault.py`; codes reserved here so that the implementation an
 
 | Item | Status on 2026-10-09 |
 |---|---|
-| this spec | draft; the purpose and the cycle (§0) were revised on 2026-10-09 with the charter; becomes `approved` after the full cycle has run once in real work |
+| this spec | `approved` 2026-10-09, binding, after the full cycle ran once in real work (T8); the purpose and the cycle (§0) were revised the same day with the charter. The format details of §4–§6 and §10 remain unchecked by a tool |
 | `process/charter.md`, `process/navigation.md` for Nexus | written 2026-10-06; charter's Goal restated 2026-10-09; navigation's route redrawn from the new goal the same day |
 | the net's paper test (P5 in Nexus's own net) | deferred 2026-10-09 with the gate; paper half held, cold reading failed; contract `process/iteration--net-paper-test.md` |
 | alignment of the foundations with the new purpose | done 2026-10-09, operator confirmed; contract `process/iteration--foundations-alignment.md` |
@@ -336,7 +336,7 @@ For `tools/validate-vault.py`; codes reserved here so that the implementation an
 | per-turn `## Now` digest (§8.3) | pending |
 | staleness line (§8.4) | pending |
 | install templates for hosts (§2) | pending; after the Nexus files prove the shape |
-| amendment to the orchestration spec (§9) | with approval of this spec |
+| amendment to the orchestration spec (§9) | done 2026-10-09 with the approval: one sentence |
 
 Hypotheses, by the charter's validation policy: every item above that is not marked done, and in particular that the full cycle holds direction in real work, that steering as behaviour keeps holding without a gate, that a net of this shape stays one screen and stays current, that the cycle applies to projects with a known path, and every format detail of §4–§6 and §10, none of which has been checked by a tool or used in a host.
 

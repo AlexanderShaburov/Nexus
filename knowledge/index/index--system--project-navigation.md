@@ -3,7 +3,7 @@ type: index
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-10-06
+updated: 2026-10-09
 source_of_truth: true
 knowledge_visibility: binding
 tags: [index, navigation, routing]
@@ -46,7 +46,7 @@ These specs define how the vault itself and the agent lifecycle are enforced. Th
 - [Architecture Review](../specs/spec--system--architecture-review.md) — mandatory dual-analysis workflow (Binding State + Development State) and four-way gap classification
 - [Nexus Update](../specs/spec--system--nexus-update.md) — version identity, ownership manifest, install baseline, upstream cache, three-way table, `apply`, the core freeze in hosts, exit codes
 - [Feedback Channel](../specs/spec--system--feedback-channel.md) — the `type: feedback` note a host writes about Nexus, the local mailbox transport (`feedback push` / `list` / `show` / `archive`) and the inbox notice in the template; GitHub-issue transport deferred
-- [Process Space](../specs/spec--system--process-space.md) — **draft, development class**: the `process/` directory beside the vault (`charter.md`, `navigation.md`, `roadmap--*`, `iteration--*`), its `state`/`owner`/`horizon` frontmatter, what the runtime will read from it, and the horizon rule against premature detail
+- [Process Space](../specs/spec--system--process-space.md) — the second layer's rules (approved 2026-10-09): the management cycle, and the `process/` directory beside the vault (`charter.md`, `navigation.md`, `roadmap--*`, `iteration--*`), its `state`/`owner`/`horizon` frontmatter, what the runtime will read from it, and the horizon rule against premature detail
 
 ---
 
