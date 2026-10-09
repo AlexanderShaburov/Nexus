@@ -70,7 +70,12 @@ Session Bootstrap MUST execute:
 -   at session start;
 -   after context compaction.
 
-It executes exactly once per session.
+It executes exactly once per session. Both triggers are the
+`SessionStart` hook (Claude Code fires it at startup, resume, clear and
+after compaction, `source: compact`); the `PreCompact` run of the same
+hook only resets the session state before compaction and injects nothing,
+since the installed Claude Code rejects `hookSpecificOutput` for that event
+(found live 2026-10-09).
 
 ------------------------------------------------------------------------
 

@@ -3,6 +3,14 @@
 
 Resets per-session state and injects the Mandatory Startup Reading Set into
 the model context. No heredoc shenanigans — stdin is the real hook input JSON.
+
+Two events, two jobs. PreCompact runs *before* compaction: it only resets the
+state, so the gates demand a fresh bootstrap afterwards; it prints nothing,
+because the installed Claude Code rejects `hookSpecificOutput` for PreCompact
+(seen live 2026-10-09: schema validation failed, the hook was reported failed),
+and context injected before compaction would be compacted away anyway. SessionStart runs at startup, resume,
+clear and *after* compaction (`source: compact`): that is where the reading
+set is injected and the position comes back.
 """
 
 import os
@@ -28,10 +36,16 @@ def main() -> int:
     inp = read_hook_input()
     event = inp.get("hook_event_name") or "SessionStart"
     session_id = inp.get("session_id") or ""
+    source = inp.get("source") or ""
 
     state = fresh_state(session_id)
     state["bootstrap"]["event"] = event
     save_state(state)
+
+    if event == "PreCompact":
+        # State reset is the whole job here; the reading set is re-injected by
+        # SessionStart(source=compact) once compaction is done.
+        return 0
 
     root = project_dir()
     missing = [p for p in REQUIRED_FILES if not (root / p).is_file()]
@@ -42,7 +56,7 @@ def main() -> int:
     lines = [
         "=== NEXUS SESSION BOOTSTRAP — MANDATORY ===",
         "",
-        f"Event: {event}. This session is UNINITIALIZED.",
+        f"Event: {event}{f' (source: {source})' if source else ''}. This session is UNINITIALIZED.",
         "You MUST complete Session Bootstrap before performing any non-trivial work.",
         "",
         "STEP 1 — Read these files (use the Read tool) in this order:",
