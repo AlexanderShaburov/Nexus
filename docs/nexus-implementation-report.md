@@ -56,6 +56,9 @@ PY
 
 # S4 — no hook writes to stdout unless it intends to (session-writer and update-check must stay silent)
 echo '{}' | .claude/hooks/nexus-session-writer.py | wc -c   # expect 0
+# S4b — the session writer against synthetic transcripts: complete turn, midnight, theme change,
+#       foreign marker, final record landing late, answer never arriving, empty payload
+python3 .claude/hooks/nexus-session-writer.py --selftest     # expect "0 failure(s)", exit 0
 echo '{}' | .claude/hooks/nexus-update-check.py | wc -c     # expect 0 (template: no installed.json)
 
 # S5 — the vault rule set still catches everything it claims to
@@ -83,7 +86,7 @@ done | sort | uniq -c
 unset CLAUDE_PROJECT_DIR
 ```
 
-Expected: S1 all `OK`; S2 no output; S3 `MISSING: none` and eight registrations (`SessionStart`×2, `PreCompact`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`×2); S4 prints `0` twice; S5 all fixtures pass; S6 `0 error(s)` and exit 0; S8 `in sync with the tree` and `all checks passed`; S9 one line, `20 completed N N` with N the size of the reading set (6 in this repository), never `pending` and never a JSON error. Before the lock (2026-10-09) the same run lost entries in 20 of 20 rounds and left `state.json` torn in 4.
+Expected: S1 all `OK`; S2 no output; S3 `MISSING: none` and eight registrations (`SessionStart`×2, `PreCompact`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`×2); S4 prints `0` twice; S4b ends with `0 failure(s)` and exit 0 (the race check archives a record appended 0.4 s after the hook started; the bounded-wait check finishes under 4 s); S5 all fixtures pass; S6 `0 error(s)` and exit 0; S8 `in sync with the tree` and `all checks passed`; S9 one line, `20 completed N N` with N the size of the reading set (6 in this repository), never `pending` and never a JSON error. Before the lock (2026-10-09) the same run lost entries in 20 of 20 rounds and left `state.json` torn in 4.
 
 S8 fails whenever a hook, a `tools/*.py` file, a binding system document or an H2 heading of `CLAUDE.md` is added, removed or renamed without regenerating the manifest: run `python3 tools/nexus-update.py manifest generate` and commit `nexus.manifest.json` with the change. Bump `nexus.version` on release, then regenerate.
 

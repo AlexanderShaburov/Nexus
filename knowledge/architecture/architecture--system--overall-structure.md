@@ -3,7 +3,7 @@ type: architecture
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-10-09
+updated: 2026-10-10
 source_of_truth: true
 knowledge_visibility: binding
 tags: [architecture, system, nexus, lifecycle, self-update]
@@ -61,10 +61,11 @@ A **non-enforcing** hook registered on the same `Stop` event as the exit gate. I
 
 Behavior:
 
-- reads the session transcript and reconstructs `(user prompt, assistant text)` turn pairs, discarding tool calls, tool results, thinking blocks, `<system-reminder>` and `<command-*>` tags;
-- writes `knowledge/sessions/session--<theme>--<YYYY-MM-DD>--<session-id8>.md`, rewriting the same file in place on every `Stop` (idempotent per session);
+- reads the session transcript and reconstructs `(user prompt, assistant text)` turn pairs, discarding tool calls, tool results, thinking blocks, `<system-reminder>` and `<command-*>` tags. Claude Code flushes the final assistant record asynchronously, so the read is retried (150 ms steps, at most 12) until the last turn ends with a Closure Block; a complete turn pays nothing, a turn still being blocked by the exit gate pays at most 1.65 s (found 2026-10-03, fixed 2026-10-10: `bugs/bug--system--session-writer-last-turn-race.md`);
+- writes `knowledge/sessions/session--<theme>--<YYYY-MM-DD>--<session-id8>.md`, rewriting the same file in place on every `Stop` (idempotent per session). The date is fixed by the session's first archive and kept when the session runs past midnight (fixed 2026-10-10: `bugs/bug--system--session-writer-midnight-rename.md`);
 - reads the theme from `.nexus/session-theme.txt` and tracks the current target in `.nexus/session-file.txt`; when the theme changes **within the same session** the existing file is renamed rather than duplicated, so one session stays one document. The marker is **session-scoped** (`{"session_id", "path"}`): it outlives the session that wrote it, so an unscoped marker would let the next session claim the previous session's archive and overwrite it. A rename requires a `session_id` match, and never clobbers an existing target;
-- preserves the original `created:` value across rewrites and bumps `updated:`.
+- preserves the original `created:` value across rewrites and bumps `updated:`;
+- `--selftest` runs it against synthetic transcripts in a temporary project directory (complete turn, midnight, theme change, foreign marker, late final record, answer never arriving, empty payload).
 
 Emitted documents carry `type: session`, `status: draft`, `source_of_truth: false`, `knowledge_visibility: historical`. They are an audit trail, not authoritative knowledge, and are distinct from the hand-written `summary--<theme>--<date>.md` handoff documents.
 
