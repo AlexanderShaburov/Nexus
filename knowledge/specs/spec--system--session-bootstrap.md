@@ -9,7 +9,7 @@ tags:
 - bootstrap
 - session
 type: spec
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 ## Relations
@@ -102,13 +102,21 @@ All invariants MUST be treated as non-negotiable constraints.
 These are read after the vault set, at session start and again after
 compaction, and the read ledger must cover them before bootstrap is
 complete. After the confirmation block the agent says in two sentences
-where the project stands and which question is being tested now. When
-`process/charter.md` is absent, bootstrap says so in one line (*this
-project has not decided what it is; the second layer is not active*)
-and the reading set is the vault set alone. Contract:
+where the project stands and which question is being tested now, names
+the step recorded in `Step:` of `process/navigation.md` after checking
+it against the repository, and continues that step rather than
+restarting the route (`spec--system--management-algorithm.md` §3, node
+0). When `process/charter.md` is absent, bootstrap says so in one line
+(*this project has not decided what it is; the second layer is not
+active*) and the reading set is the vault set alone. When the charter
+exists but its `status` is not `approved`, the documents are read as
+usual and bootstrap says in one line that no agreed Project Goal is
+recorded, so the agent proposes forming the goal with the operator
+before proposing objectives or work; `approved` records an agreement
+that took place and is not re-asked without grounds. Contract:
 `spec--system--process-space.md` §8.1–8.2; realized 2026-10-09 in
 `.claude/hooks/nexus-bootstrap.py` and the read ledger of
-`nexus-tool-gate.py`.
+`nexus-tool-gate.py`; the status line and the step added 2026-10-10.
 
 The ledger MUST record every read of a required file, including reads
 issued in parallel in one assistant message: Claude Code runs their

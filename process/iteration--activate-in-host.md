@@ -2,16 +2,20 @@
 type: iteration
 id: T5b
 status: approved
-state: in_progress
+state: superseded
 owner: agent
 horizon: near
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-10
+closed: 2026-10-10
+superseded_by: process/iteration--vertical-slice.md
 depends_on: [process/iteration--deliver-second-layer.md]
 refs: [knowledge/specs/spec--system--process-space.md, knowledge/specs/spec--system--architecture-review.md]
 ---
 
 # Recover the position of Liquid_Nexus and let the runtime carry it
+
+**Superseded 2026-10-10 by `process/iteration--vertical-slice.md` (T9), after a partial result.** Two sessions in the host (archives `session--framing-reset--2026-10-10--e5f044cf.md` and `--7251ab02.md` there, copied to `experiment_results/` here). Expected: the host's agent reconstructs the position, the operator agrees, the two documents are written, a fresh session states the position. Obtained: step 1 done as the contract asked (facts, interpretations and operator questions kept apart; the agent found that no project goal was recorded and asked for one); step 2 partial (the operator corrected five points and gave an organizational goal, the goal question stayed unanswered); in the second session the agent proposed writing the charter with the product's goal in it, and only after the operator pointed at §0 identified the missing goal as the obstacle. The operator stopped the experiment. Deviation fed into planning: the cause lay in the delivered rules (§0 made the charter file the proof of a goal; §7 told the agent to create the charter in the first session that found it missing), not in the host; the operator's original flowchart was recovered, the algorithm's entry redesigned (one entry, goal agreed before any file, a Program Counter that survives sessions), the rules corrected, and T9 opened with the same goal for the host plus the continuity check. Found on the way and fixed the same day: the session archive renamed past midnight and the last answer of a session lost (`knowledge/bugs/`). The feedback channel was not used by the host's agent for either.
 
 Proposed 2026-10-09 after T5a delivered the second layer's infrastructure to Liquid_Nexus. The operator approved the direction the same day, and then the contract with two refinements written into step 1 and step 2 (the separation of facts, interpretations and questions is a matter of substance, not of marking every sentence; there is no fixed limit on repeated reconstructions, the agent stops when a repetition no longer brings the picture closer and offers the choice). The refinement that shapes the whole iteration: writing `charter.md` and `navigation.md` is not the goal. The goal is the **actual position of Liquid_Nexus, recovered from what the project already knows**. The host's agent first studies the project's documents, plans, decisions and history and presents a substantive reconstruction of its purpose, its results so far and its uncertainties, keeping three things apart: confirmed facts, the agent's interpretations, and questions only the operator can settle. Only after the operator has agreed to the reconstruction are the two process documents written, from it. The full management cycle in the host is the next iteration (T5c), not this one.
 

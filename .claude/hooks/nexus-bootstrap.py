@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from _nexus_common import (  # noqa: E402
     PROCESS_CHARTER,
+    charter_status,
     REQUIRED_FILES,
     REQUIRED_INVARIANTS_DIR,
     emit_context,
@@ -69,11 +70,27 @@ def main() -> int:
         # spec--system--process-space.md §8.1–8.2: the project's position is part
         # of the reading set, at session start and again after compaction.
         lines += [f"  {5 + i}. {p}" for i, p in enumerate(process_docs)]
-        lines += [
-            "     (project position: charter, navigation, iteration(s) in progress;",
-            "      spec--system--process-space.md §8). After the confirmation block, say in",
-            "      two sentences where the project stands and which question is being tested now.)",
-        ]
+        status = charter_status()
+        if status == "approved":
+            # spec--system--management-algorithm.md §3, node 0: restore the saved
+            # position, verify it against the repository, continue the step.
+            lines += [
+                "     (project position: charter, navigation, iteration(s) in progress;",
+                "      spec--system--process-space.md §8). After the confirmation block, say in",
+                "      two sentences where the project stands and which question is being tested now,",
+                "      name the step recorded in `Step:` of process/navigation.md after checking it",
+                "      against the repository, and continue that step; do not restart the route.)",
+            ]
+        else:
+            # The charter exists but records no agreement: the Project Goal is
+            # not agreed. Read the documents, do not plan work from them.
+            lines += [
+                "     (project position: charter, navigation, iteration(s) in progress;",
+                "      spec--system--process-space.md §8.)",
+                f"     {PROCESS_CHARTER} has status: {status or 'unknown'}, not approved: no agreed Project Goal",
+                "      is recorded. Do not propose objectives or work from it; propose forming the goal",
+                "      with the operator first (spec--system--management-algorithm.md §3, block 1).",
+            ]
     else:
         lines += [
             "",

@@ -31,6 +31,7 @@ PROCESS_DIR = "process"
 PROCESS_CHARTER = "process/charter.md"
 PROCESS_NAVIGATION = "process/navigation.md"
 _FRONTMATTER_STATE_RE = re.compile(r"(?m)^state:\s*([A-Za-z_]+)\s*$")
+_FRONTMATTER_STATUS_RE = re.compile(r"(?m)^status:\s*([A-Za-z_-]+)\s*$")
 
 # Tools allowed while bootstrap is pending (read-only vault traversal).
 READ_ONLY_TOOLS = {"Read", "Glob", "Grep", "LS", "NotebookRead", "TodoWrite", "TaskList", "TaskGet", "TaskOutput"}
@@ -156,7 +157,7 @@ def process_documents() -> list[str]:
     return docs
 
 
-def _frontmatter_state(path: pathlib.Path) -> str:
+def _frontmatter_field(path: pathlib.Path, regex: "re.Pattern[str]") -> str:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
@@ -166,8 +167,26 @@ def _frontmatter_state(path: pathlib.Path) -> str:
     end = text.find("\n---", 3)
     if end < 0:
         return ""
-    m = _FRONTMATTER_STATE_RE.search(text[3:end])
+    m = regex.search(text[3:end])
     return m.group(1) if m else ""
+
+
+def _frontmatter_state(path: pathlib.Path) -> str:
+    return _frontmatter_field(path, _FRONTMATTER_STATE_RE)
+
+
+def charter_status() -> str:
+    """`status:` of process/charter.md; "" when the file is absent or unreadable.
+
+    The charter's `status: approved` is the record that the Project Goal was
+    agreed by the operator (spec--system--process-space.md §4). It records an
+    agreement that took place; it is not proof that the goal is still current,
+    and bootstrap does not ask for re-agreement without grounds
+    (spec--system--management-algorithm.md §3). A charter that exists with any
+    other status is read like an approved one, but bootstrap says that no
+    agreed Project Goal is recorded.
+    """
+    return _frontmatter_field(project_dir() / PROCESS_CHARTER, _FRONTMATTER_STATUS_RE)
 
 
 def required_files(state: dict[str, Any] | None = None) -> list[str]:
