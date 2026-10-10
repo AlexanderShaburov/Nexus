@@ -3,7 +3,7 @@ type: spec
 scope: system
 status: approved
 created: 2026-04-17
-updated: 2026-10-09
+updated: 2026-10-10
 source_of_truth: true
 knowledge_visibility: binding
 tags: [knowledge, orchestration, plan-status]
@@ -212,6 +212,8 @@ After completing a phase, Claude MUST:
 Claude MUST NOT automatically advance from Phase N to Phase N+1 merely because no blockers were detected.
 
 For non-phased or trivial work, this rule does not apply.
+
+Work items in a Current Objective iteration contract (`process/iteration--*.md`, `## Work`) are not phase boundaries by default. The Phase Progression Rule applies to them only when the contract explicitly declares a phased plan or identifies specific approval gates. Every other requirement of operator agreement stays as it is: the agent proposes, the operator decides at the points the contract and the charter name. (Added 2026-10-10 after the first host experiment, where the agent treated every work item as a phase and paused between them; `spec--system--management-algorithm.md` §3, block 5, has no permission node between tasks.)
 ---
 
 ## Closure Requirement
