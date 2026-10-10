@@ -3,7 +3,7 @@ type: index
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-10-09
+updated: 2026-10-10
 source_of_truth: true
 knowledge_visibility: binding
 tags: [index, navigation, routing]
@@ -47,6 +47,7 @@ These specs define how the vault itself and the agent lifecycle are enforced. Th
 - [Nexus Update](../specs/spec--system--nexus-update.md) — version identity, ownership manifest, install baseline, upstream cache, three-way table, `apply`, the core freeze in hosts, exit codes
 - [Feedback Channel](../specs/spec--system--feedback-channel.md) — the `type: feedback` note a host writes about Nexus, the local mailbox transport (`feedback push` / `list` / `show` / `archive`) and the inbox notice in the template; GitHub-issue transport deferred
 - [Process Space](../specs/spec--system--process-space.md) — the second layer's rules (approved 2026-10-09): the management cycle, and the `process/` directory beside the vault (`charter.md`, `navigation.md`, `roadmap--*`, `iteration--*`), its `state`/`owner`/`horizon` frontmatter, what the runtime will read from it, and the horizon rule against premature detail
+- [Management Algorithm](../specs/spec--system--management-algorithm.md) — the canonical conceptual algorithm of the second layer (v4, approved 2026-10-10): one entry with restoration of the execution state, Project Goal formed with the operator, Planning Horizon, Current Objective, the work block with its two exits, evaluation and review of the goal, the end of the project; definitions of Program Counter and Execution Context; §5 says which behaviours are realized today and which are not
 
 ---
 
