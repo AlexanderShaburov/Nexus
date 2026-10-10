@@ -3,7 +3,7 @@ type: plan
 scope: system
 status: in-progress
 created: 2026-09-22
-updated: 2026-10-09
+updated: 2026-10-10
 source_of_truth: false
 knowledge_visibility: development
 plan_status: in_progress
@@ -319,6 +319,8 @@ Phase boundaries are pause points per `spec--system--knowledge-driven-task-orche
 Release `v1.2.0` (2026-09-22): the installer (`install`, `up`, `nexus.py`), the index-entry keying fix, the `LK002` link rule and the feedback channel's F3 guidance. First release the bootstrap can run from. Phase 5 (retrofit of Liquid_Nexus and the other hosts) is now a one-command operator step per installation guide Part 1.
 
 Release `v1.3.0` (2026-09-22): the `plan_status` field contributed by Liquid_Nexus (frontmatter spec, orchestration spec, validator rules `PS001`/`PS002`/`PS100`), and the apply-report count fix. First release that carries a host contribution back to hosts; `up` in Liquid_Nexus should turn its two remaining customizations into updates.
+
+Release `v1.5.0` (2026-10-10): the first vertical slice of the management algorithm, for the T9 experiment in Liquid_Nexus: `spec--system--management-algorithm.md` (the canonical algorithm, v4), `Step:` and `Came from:` in the navigation's `## Now`, the bootstrap line that distinguishes an absent charter from one whose `status` is not `approved` and asks the agent to name and continue the step, the Steering entry behaviour, and the session-writer fixes (archive name kept past midnight, last answer of a session no longer lost). Delivered, not yet tested in any host; the host's `process/` is never touched.
 
 Release `v1.4.0` (2026-10-09): the second layer's infrastructure, delivered and not yet tested in any host: the bootstrap hook reads `process/charter.md`, `process/navigation.md` and the iterations in progress when a charter exists (the position survives session start and compaction), `PreCompact` reset-only, the tool gate's read ledger under a lock with atomic state writes, `spec--system--process-space.md` approved and binding, `decision--system--second-layer-purpose.md`, the Steering section of `CLAUDE.md`, the Planning Artifacts rule bounded by the charter's horizon. The host's `process/` is never delivered or touched. Contract of the delivery: `process/iteration--deliver-second-layer.md`. Applied in Liquid_Nexus the same day with `up`: 61 unchanged, protected areas byte-identical by checksum, second host → template → host loop closed.
 
