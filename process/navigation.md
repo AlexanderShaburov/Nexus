@@ -19,9 +19,9 @@ Why here: every path to the goal (P9) passes through P8, one host running the la
 
 Ignoring: the position gate; validator rules for process documents; the per-turn `## Now` digest and the staleness line; a separate Execution State file; an interpreter of the algorithm, recovery after an abnormal end, parallel sessions, a task system; templates for charter and navigation; any picture of the net; other hosts; the small findings of T9 (`--reads` rejecting a directory, the resting place of the counter between tasks, the unused feedback channel) until they are given a priority.
 
-Step: 5.3 of T5c — the first task of the plan, the host's update to 1.5.1 (`push` here, `plan` and `up --apply` in Liquid_Nexus, by the operator), then 5.4: check the update's result; the host sessions of checks A and B come after that.
+Step: 5.2 of T5c — the host's update to 1.5.1 is done and checked (5.4, below); the next task to pick is a host session: check B at a moment of the operator's choosing, or check A when the second founder's reading arrives. Nothing on the Nexus side until one of them has a result.
 
-Came from: node 4 → ВХОД БЛОКА 5 of T5c on 2026-10-10 — the contract was approved with the operator's refinements, after the Project Goal of Nexus had been confirmed unchanged at node 7 following T9.
+Came from: 5.4 of T5c on 2026-10-10 — Liquid_Nexus updated 1.5.0 → 1.5.1 by the operator: 1 unit written (the orchestration spec), 62 unchanged, `process/` untouched, backup and baseline written, validation clean; expected and obtained match.
 
 ## Net
 
