@@ -19,9 +19,9 @@ Why here: every path to the goal (P9) passes through P8, one host running the la
 
 Ignoring: the position gate; validator rules for process documents; the per-turn `## Now` digest and the staleness line; a separate Execution State file; an interpreter of the algorithm, recovery after an abnormal end, parallel sessions, a task system; templates for charter and navigation; any picture of the net; other hosts; the small findings of T9 (`--reads` rejecting a directory, the resting place of the counter between tasks, the unused feedback channel) until they are given a priority.
 
-Step: 5.2 of T5c — the host's update to 1.5.1 is done and checked (5.4, below); the next task to pick is a host session: check B at a moment of the operator's choosing, or check A when the second founder's reading arrives. Nothing on the Nexus side until one of them has a result.
+Step: 5.2 of T5c — check B done and judged positive (5.4, below); the one remaining task is check A, which waits for the second founder's reading of the host's charter and navigation. Nothing on the Nexus side until it has a result.
 
-Came from: 5.4 of T5c on 2026-10-10 — Liquid_Nexus updated 1.5.0 → 1.5.1 by the operator: 1 unit written (the orchestration spec), 62 unchanged, `process/` untouched, backup and baseline written, validation clean; expected and obtained match.
+Came from: 5.4 of T5c on 2026-10-10 — check B in Liquid_Nexus judged positive by the operator: the host's agent noticed on its own that an architecture request lay beyond the current objective and the horizon, explained the consequences, recommended a parallel objective, and on the operator's choice to defer recorded the request in one line and kept the route; the strong form of holding direction is observed once.
 
 ## Net
 
@@ -57,7 +57,7 @@ Transitions (work; inputs → outputs; ! critical, ? feasibility unknown, ← no
 
 ## Uncertainty points
 
-- Whether the agent closes a Current Objective against the Project Goal and chooses the next cycle on its own, and whether it prevents a departure from the goal without the operator's prompt. The two properties T9 left unconfirmed; T5c tests them.
+- Whether the agent closes a Current Objective against the Project Goal and chooses the next cycle on its own (check A of T5c, open), and whether it prevents a departure from the goal without the operator's prompt (check B of T5c: **observed once, positive, 2026-10-10**; whether it holds in ordinary sessions without a test remains to be seen).
 - Whether the "charter not approved" line of bootstrap keeps the agent from planning work; the path was never seen live (the host's charter stayed in `review` for one turn).
 - Where the counter rests between tasks (5.2 after each 5.4, as the host's agent chose, or a direct continuation of the approved plan); observation only, the algorithm is not changed on one case.
 - Whether the host's T1 closes on the cold reading of a second person within a useful time; T5c's timing depends on it.
@@ -75,4 +75,4 @@ Transitions (work; inputs → outputs; ! critical, ? feasibility unknown, ← no
 - Delivery to the first host (T5a): done 2026-10-09; P12 marked.
 - Activation in the first host (T5b): partial, 2026-10-10; superseded by T9.
 - Vertical slice (T9): done 2026-10-10. Expected: five properties observed in three host sessions. Obtained: 1, 2, 5 positive, 3 and 4 partial, by the operator's judgement; the recorded `Step:` changed behaviour; restoration cost fell from a session to one turn. Deviation: the closure of the objective could not be observed because the host's T1 closes on a second person; moved to T5c. P13 and P15 marked.
-- Host cycle (T5c): in Liquid_Nexus, with no instruction about `process/`, the agent closes T1 when its criterion is met (6а, node 7 with an assessment of the Project Goal presented to the operator), proposes the next objective with its reason, runs it, and at least once names on its own a piece of work that does not serve the objective and offers the choice. The operator judges properties 3 (strong form) and 4 (full form) by behaviour. Then P8 is marked.
+- Host cycle (T5c): two checks. B, controlled deviation: done 2026-10-10, positive by the operator's judgement; the agent named the discrepancy before work, explained the consequences, recommended, and did what the operator chose. A, closure of T1 by its own criteria with the node 7 assessment and the next objective: waits for the second founder's reading. P8 is marked only when A is judged too.
