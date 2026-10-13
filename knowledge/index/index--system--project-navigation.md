@@ -3,7 +3,7 @@ type: index
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-10-10
+updated: 2026-10-13
 source_of_truth: true
 knowledge_visibility: binding
 tags: [index, navigation, routing]
@@ -79,6 +79,7 @@ Hooks live outside the vault under `.claude/hooks/` and operate against runtime 
 
 - `nexus-session-writer.py` — Stop; archives the transcript to `sessions/` (architecture §2a)
 - `nexus-vault-validator.py` — PostToolUse; advisory frontmatter validation of a document just written (architecture §2b)
+- `nexus-algorithm-core.py`, `nexus-algorithm-reading.py` — UserPromptSubmit; experimental since 1.6.0: deliver §§1–3 of the management algorithm verbatim at every prompt, as two bounded parts cut from the spec by `nexus-management-algorithm.py`; the prompt gate adds the saved position from `process/navigation.md` (architecture §2g, spec [Process Space](../specs/spec--system--process-space.md) §8.3)
 - `nexus-update-check.py` — SessionStart; in a host with a baseline, one throttled `ls-remote` and one line of context when a newer Nexus tag exists; in the template, one line with the feedback inbox count (architecture §2e, specs [Nexus Update](../specs/spec--system--nexus-update.md) §7 and [Feedback Channel](../specs/spec--system--feedback-channel.md) §4)
 
 ## Runtime (tools)
@@ -92,6 +93,7 @@ Hooks live outside the vault under `.claude/hooks/` and operate against runtime 
 
 - [Context Decision claim via tool call](../plans/plan--system--context-decision-claim.md) — why the gate accepts a Bash claim alongside the text block; rollout order.
 - [Nexus self-update](../plans/plan--system--nexus-self-update.md) — ownership manifest, three-way comparison, upstream fetch, SessionStart notifier, CLI, retrofit path, core freeze in hosts. Status: in progress; Phases 1–4 implemented, Phase 5 (retrofit of existing hosts) pending.
+- [Algorithm and position delivered at every prompt](../plans/plan--system--algorithm-delivery-per-prompt.md) — the experiment of 2026-10-13: three `UserPromptSubmit` outputs carry the algorithm's text and the saved position; what was built, the registration defect found before release, the checks passed and what is not proven. Status: in progress; released as 1.6.0 for a host experiment.
 - [Nexus feedback channel](../plans/plan--system--nexus-feedback-channel.md) — how hosts send observations about Nexus upstream without push rights: `feedback` notes in the host vault, local mailbox in the updater cache, deferred GitHub-issue transport. Status: implemented (F1–F3); F4 deferred.
 
 ---

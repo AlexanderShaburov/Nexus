@@ -3,7 +3,7 @@ type: spec
 scope: system
 status: approved
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-13
 source_of_truth: true
 knowledge_visibility: binding
 theme: progressive-resolution
@@ -198,6 +198,8 @@ What realizes each behaviour today. *Mechanism* = a hook or tool runs it; *rule*
 | session boundary is not a cycle event | bootstrap re-reads `process/`; nothing triggers a review at start | realized by absence |
 | Focused Execution before substantial work | Steering §2–§3 | habit, judged useful 2026-10-08, not enforced |
 | per-turn `## Now` digest, staleness line, `PR…` validator | process-space §8.3–8.5 | pending, unchanged by this document |
+
+**Amendment of 2026-10-13 (the table above is kept as written on 2026-10-10).** Two rows have moved. *Program Counter and last transition*: recorded since the first slice (2026-10-10) as `Step:` and `Came from:` in `## Now` of the navigation; since Nexus 1.6.0 they are also parsed and delivered at every prompt by `nexus-prompt-gate.py`, a mechanism for *delivery*; Execution Context has no record of its own beyond the pointer to the iteration contract. *Plan fit, 5.5, 6а/6б and 7*: still realized by nothing that checks them, but §§1–3 of this document now reach the agent verbatim at every prompt through `nexus-algorithm-core.py` and `nexus-algorithm-reading.py`, with an instruction not to skip a due evaluation or the review of the goal. That is an experiment, not a confirmed realization: whether it changes behaviour is the question of the host experiment (`process-space` §8.3; `plans/plan--system--algorithm-delivery-per-prompt.md`). **A constraint on this document follows:** the headings of §1–§4 must each occur exactly once, in order, and §§1–2 and §3 must each fit in about 9,500 characters, or the hooks deliver an explicit error in place of the text.
 
 ## 6. Consequences for existing documents (pending, proposed on 2026-10-10)
 

@@ -11,7 +11,8 @@ This document is the acceptance procedure for `.claude/hooks/`. Run it after **a
 | Hook | Event(s) | Role | Can block? |
 |---|---|---|---|
 | `nexus-bootstrap.py` | `SessionStart`, `PreCompact` | Resets `.nexus/state.json` on both; injects the Mandatory Startup Reading Set on `SessionStart` only (incl. `source: compact`, after compaction); silent on `PreCompact` | no (injects context) |
-| `nexus-prompt-gate.py` | `UserPromptSubmit` | Increments turn index, resets the per-turn decision flag, injects the turn contract | no (injects context) |
+| `nexus-prompt-gate.py` | `UserPromptSubmit` | Increments turn index, resets the per-turn decision flag, injects the turn contract; since 1.6.0 (experimental) also the management instructions and the saved position read from `process/navigation.md` | no (injects context) |
+| `nexus-algorithm-core.py`, `nexus-algorithm-reading.py` | `UserPromptSubmit` | Experimental since 1.6.0: §§1–2 and §3 of the management algorithm spec, verbatim, one bounded output each; launchers of `nexus-management-algorithm.py`, which cuts the parts from the spec. Read-only | no (injects context) |
 | `nexus-tool-gate.py` | `PreToolUse` | Bootstrap gate + Context Decision gate | **yes** (`permissionDecision: deny`) |
 | `nexus-exit-gate.py` | `Stop` | Closure Block validation | **yes** (`decision: block`) |
 | `nexus-session-writer.py` | `Stop` | Transcript archival to `knowledge/sessions/` | no (silent by design) |
@@ -71,6 +72,9 @@ python3 tools/validate-vault.py
 python3 tools/nexus-update.py manifest verify
 python3 tools/nexus-update.py --selftest
 
+# S10 — the three UserPromptSubmit outputs: bounded, verbatim, read-only, and each registration a unit the updater delivers
+python3 -m unittest discover -s tests -p 'test_nexus_management_context.py'
+
 # S9 — parallel reads all reach the ledger (the tool gate's read-modify-write is locked)
 # Run against a COPY of the repo: the bootstrap hook resets the live session's state.
 R=$(mktemp -d)/repo && mkdir -p "$R" && tar --exclude=.git --exclude=.nexus -cf - . | (cd "$R" && tar -xf -)
@@ -86,7 +90,7 @@ done | sort | uniq -c
 unset CLAUDE_PROJECT_DIR
 ```
 
-Expected: S1 all `OK`; S2 no output; S3 `MISSING: none` and eight registrations (`SessionStart`×2, `PreCompact`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`×2); S4 prints `0` twice; S4b ends with `0 failure(s)` and exit 0 (the race check archives a record appended 0.4 s after the hook started; the bounded-wait check finishes under 4 s); S5 all fixtures pass; S6 `0 error(s)` and exit 0; S8 `in sync with the tree` and `all checks passed`; S9 one line, `20 completed N N` with N the size of the reading set (6 in this repository), never `pending` and never a JSON error. Before the lock (2026-10-09) the same run lost entries in 20 of 20 rounds and left `state.json` torn in 4.
+Expected: S1 all `OK`; S2 no output; S3 `MISSING: none` and ten registrations (`SessionStart`×2, `PreCompact`, `UserPromptSubmit`×3, `PreToolUse`, `PostToolUse`, `Stop`×2); a registration whose command carries arguments or an interpreter prefix shows here as missing and is also invisible to the updater, so it never reaches a host (found 2026-10-13); S4 prints `0` twice; S4b ends with `0 failure(s)` and exit 0 (the race check archives a record appended 0.4 s after the hook started; the bounded-wait check finishes under 4 s); S5 all fixtures pass; S6 `0 error(s)` and exit 0; S8 `in sync with the tree` and `all checks passed`; S9 one line, `20 completed N N` with N the size of the reading set (6 in this repository), never `pending` and never a JSON error; S10 `OK` (14 tests). Before the lock (2026-10-09) the same run lost entries in 20 of 20 rounds and left `state.json` torn in 4.
 
 S8 fails whenever a hook, a `tools/*.py` file, a binding system document or an H2 heading of `CLAUDE.md` is added, removed or renamed without regenerating the manifest: run `python3 tools/nexus-update.py manifest generate` and commit `nexus.manifest.json` with the change. Bump `nexus.version` on release, then regenerate.
 
@@ -212,6 +216,7 @@ These cannot be scripted; they require a real Claude Code session. Perform them 
 | B20 | Time B18(b) and B19's second run | Well under the 15 s hook timeout: the network run is bounded by the 5 s `ls-remote` timeout, the throttled run is file I/O only |
 | B22 | **Live, in a host copy with a baseline:** start a fresh session and ask the agent to change a Nexus hook (for example, "make the exit gate accept a lowercase closure block") | The `Edit` is denied with `NEXUS CORE FILE`; the turn ends with a new `knowledge/feedback/feedback--nexus--*.md` that validates clean and, if asked, a `feedback push`; the hook file is unchanged (`nexus-update.py status` shows it `unchanged`) |
 | B23 | In a temporary copy of the project (never the working tree: the hook resets `.nexus/state.json`), pipe `{"hook_event_name":"SessionStart","session_id":"t"}` into `nexus-bootstrap.py` with `CLAUDE_PROJECT_DIR=<copy>` three times: with `process/charter.md` absent; present with `status: draft`; present with `status: approved` | Absent: one line `No process/charter.md …`, items 5+ absent. Draft: items 5+ listed and the line `process/charter.md has status: draft, not approved: no agreed Project Goal is recorded …`. Approved: items 5+ listed and the instruction to name and continue the step in `Step:`; no status line |
+| B24 | **Live, one round for `UserPromptSubmit`:** in a fresh session of a project with an approved charter, after `/hooks`, ask what the hooks delivered and where the project stands, forbidding any change | The agent reports the text of §§1–3 of the algorithm received in context (not a file pointer), in two parts, and the node, the Current Objective, `Step:` and `Came from:` as recorded in `process/navigation.md`; it changes neither field. Observed 2026-10-13 in the template with the earlier registration form; **not yet observed with the launcher registrations, nor in a host** |
 | B21 | With `NEXUS_UPSTREAM_CACHE` pointing at a scratch directory: in a host copy write a valid `knowledge/feedback/feedback--nexus--*.md`, run `python3 tools/nexus-update.py feedback push`, then pipe `{"hook_event_name":"SessionStart"}` into `nexus-update-check.py` with `CLAUDE_PROJECT_DIR=<template>` | `push` reports one delivery and appends `inbox:<timestamp>` to the note; the hook emits one line `Nexus feedback inbox: 1 note from <host> (1)`; after `feedback archive --all-from <host>` the hook is silent again; with the default cache and an empty mailbox `echo '{}' \| hook \| wc -c` prints `0` (S4) |
 
 ### The transcript race (track B4, B9 and B12 carefully)
@@ -279,7 +284,7 @@ Distinct from the race: in some Claude Code builds (2.1.278 with Fable 5.1, 2026
 
 Do not claim the hooks work until all of these are true:
 
-- [ ] Section 2 static checks S1–S6 and S8 pass
+- [ ] Section 2 static checks S1–S6, S8 and S10 pass
 - [ ] Section 3 fixtures report `FAILURES: 0`, including S7
 - [ ] Section 4 rows B1–B22 observed (B9 assessed against the race note, B4 against the narration note; B15–B21 are scriptable by piping JSON, B22 needs a live session)
 - [ ] Any hook text that quotes a contract is mirrored in the corresponding spec under `knowledge/specs/`

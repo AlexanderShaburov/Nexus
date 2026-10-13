@@ -42,6 +42,18 @@
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/nexus-prompt-gate.py",
             "timeout": 15,
             "statusMessage": "NEXUS turn contract"
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/nexus-algorithm-core.py",
+            "timeout": 15,
+            "statusMessage": "NEXUS algorithm core"
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/nexus-algorithm-reading.py",
+            "timeout": 15,
+            "statusMessage": "NEXUS algorithm reading"
           }
         ]
       }

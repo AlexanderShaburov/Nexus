@@ -3,7 +3,7 @@ type: architecture
 scope: system
 status: approved
 created: 2026-04-18
-updated: 2026-10-10
+updated: 2026-10-13
 source_of_truth: true
 knowledge_visibility: binding
 tags: [architecture, system, nexus, lifecycle, self-update]
@@ -51,7 +51,7 @@ Directories by role:
 Shell + Python scripts invoked by Claude Code at lifecycle events. They read and mutate `.nexus/state.json` and inject `additionalContext` / `decision: block` JSON to steer the agent. The state is written atomically (temp file + rename), so a concurrent reader never sees a torn file.
 
 - `nexus-bootstrap.py` — runs on `SessionStart` and `PreCompact`. Resets state on both; injects the Mandatory Startup Reading Set on `SessionStart` only, which Claude Code fires at startup, resume, clear and **after** compaction (`source: compact`). On `PreCompact`, which fires *before* compaction, the hook prints nothing: the installed Claude Code rejects `hookSpecificOutput` for that event (found live 2026-10-09: schema validation failed on `hookEventName: "PreCompact"` and the hook was reported failed), and context injected there would be compacted away anyway. The reset before compaction keeps the gates armed even if the post-compaction `SessionStart` were missing. When `process/charter.md` exists, the set also carries the project position: the charter, `process/navigation.md` and every `process/iteration--*.md` with `state: in_progress` (spec `spec--system--process-space.md` §8.1–8.2); these are recorded in the state's `required_files`, so the read ledger must cover them too. Without a charter the hook says so in one line; with a charter whose `status` is not `approved` it reads the documents and says in one line that no agreed Project Goal is recorded; with an approved charter it asks the agent to name and continue the step in `Step:` of the navigation (since 2026-10-10, `spec--system--management-algorithm.md` §3).
-- `nexus-prompt-gate.py` — runs on `UserPromptSubmit`. Resets per-turn state and injects Decision Gate + Exit Gate reminders. Hard-blocks prompts while bootstrap is pending unless the prompt is a read-only KB query.
+- `nexus-prompt-gate.py` — runs on `UserPromptSubmit`. Resets per-turn state and injects Decision Gate + Exit Gate reminders. Hard-blocks prompts while bootstrap is pending unless the prompt is a read-only KB query. Since 1.6.0 the same output also carries the management context of §2g; that part gates nothing.
 - `nexus-tool-gate.py` — runs on `PreToolUse`. While bootstrap pending, only read-only tools (`Read`/`Glob`/`Grep`/`LS`/`NotebookRead`) are allowed, on any path — reads cannot mutate, so the gate constrains tool class, not location. Tracks read-ledger to auto-complete bootstrap. The whole gate runs under an exclusive `flock` on `.nexus/state.lock`: Claude Code runs the PreToolUse hooks of parallel tool calls concurrently, and without the lock each hook loaded the same state and the last writer won (found live 2026-10-09: one of seven parallel bootstrap reads vanished from the ledger; reproduced on a copy, 20 of 20 rounds lost entries and 4 left `state.json` torn, which `load_state` reads as `{}` and the gate then fails open). After bootstrap, non-read tools require a Decision Gate statement in the current turn, accepted in two forms checked in order: the per-turn flag already set; a **claim** (`python3 tools/nexus-decide.py ...`) read from `tool_input.command`; the `### Context Decision` text block read from the transcript. A malformed claim is denied with the defect named. In a host with a baseline (`.nexus/installed.json`), the editing tools are denied on a Nexus core path (every `replace` unit) unless `.nexus/unlock.txt` lists it; this **core freeze** is checked after the bootstrap gate and before the decision check, and is inactive in the template (spec `spec--system--nexus-update.md` §6).
 - `nexus-exit-gate.py` — runs on `Stop`. Parses transcript, validates Closure Block presence + field shape + dependency rules. Blocks completion with a `reason` on violation.
 
@@ -99,6 +99,15 @@ A **non-enforcing** hook on `SessionStart` only, registered after `nexus-bootstr
 
 Hosts do not edit the Nexus core (§2 tool gate), so observations about Nexus travel the other way as `type: feedback` notes in the host's `knowledge/feedback/`, validated by `tools/validate-vault.py`. `feedback push` copies undelivered or changed notes into `${NEXUS_UPSTREAM_CACHE:-~/.cache/nexus}/inbox/<host>/` with a sidecar and appends a receipt to the note; `feedback list|show|archive` triage the mailbox in the template. No network, no credentials, no registry of hosts: both sides use a fixed local directory. Contract: `specs/spec--system--feedback-channel.md`.
 
+### 2g. Management context at every prompt (`nexus-prompt-gate.py`, `nexus-algorithm-core.py`, `nexus-algorithm-reading.py`, `nexus-management-algorithm.py`)
+
+**Experimental since 2026-10-13 (Nexus 1.6.0), non-enforcing.** At every `UserPromptSubmit` three hooks answer, each with its own output kept under 9,800 characters because Claude Code cuts a hook's output at 10,000:
+
+- `nexus-prompt-gate.py` appends to the turn contract (or to the bootstrap reminder) the instructions for reading the operator's message against the current operation, and the **saved position** parsed from `## Now` of `process/navigation.md`: the charter's status, the node and the Current Objective taken from `Step:`, `Step:` and `Came from:` verbatim, and the iteration contracts in progress. It reads `process/`; it writes only the per-turn runtime state it wrote before.
+- `nexus-algorithm-core.py` and `nexus-algorithm-reading.py` deliver §§1–2 and §3 of `specs/spec--system--management-algorithm.md` verbatim. Both are launchers of `nexus-management-algorithm.py`, which reads the spec at every call and cuts it by the headings of §1–§4, so no copy of the algorithm lives in a hook. They read the hook payload and write nothing, so they cannot race the prompt gate on `state.json`. There is one launcher per part because the updater identifies a hook entry by `<event>/<nexus-*.py basename>` (`specs/spec--system--nexus-update.md` §2.2): one script registered twice with different arguments is not a unit a host can receive.
+
+The order in which the three outputs arrive is not guaranteed. Every failure replaces the content by an explicit message and never by a guess or a silent cut: spec unreadable, a heading missing or out of order, a part too large, the navigation unreadable or its `Step:` not beginning with a node, the main output too large. Without `process/charter.md` the position block says the second layer is not active; the two algorithm parts are delivered regardless. The hooks do not check transitions and never move the position. Contract: `specs/spec--system--process-space.md` §8.3. Design, checks and what is not proven: `plans/plan--system--algorithm-delivery-per-prompt.md` (development class).
+
 ### 3. Runtime State (`.nexus/`)
 
 - `.nexus/state.json` — per-session runtime state (bootstrap status, read-ledger, per-turn decision flag, prompt index). Ephemeral; regenerated at each `SessionStart`. Written atomically. Gitignored.
@@ -133,11 +142,17 @@ SessionStart (startup | resume | clear | compact) / PreCompact
         ├─ else one `git ls-remote --tags`, 5 s budget → record ok / no-tags / unreachable
         └─ newer v* tag than installed → one line of context; otherwise nothing
 
-UserPromptSubmit
-  └─> nexus-prompt-gate.py
-        ├─ reset per-turn flags
-        ├─ if bootstrap pending: inject bootstrap-first reminder
-        └─ else: inject Decision Gate + Exit Gate contract
+UserPromptSubmit   (three hooks, three outputs; arrival order not guaranteed)
+  ├─> nexus-prompt-gate.py
+  │     ├─ reset per-turn flags
+  │     ├─ if bootstrap pending: inject bootstrap-first reminder
+  │     ├─ else: inject Decision Gate + Exit Gate contract
+  │     └─ in both cases append the management instructions and the saved position
+  │          (node, Current Objective, Step:, Came from: read from process/navigation.md)
+  ├─> nexus-algorithm-core.py      (non-enforcing, read-only) algorithm spec §§1–2 verbatim
+  └─> nexus-algorithm-reading.py   (non-enforcing, read-only) algorithm spec §3 verbatim
+        both launch nexus-management-algorithm.py; an unreadable, malformed or
+        oversize source yields an explicit error text, never a truncated part
 
 PreToolUse
   └─> nexus-tool-gate.py

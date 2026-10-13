@@ -32,7 +32,7 @@ The enforcement layer is:
 - `.claude/hooks/nexus-exit-gate.py`
 - `.claude/hooks/_nexus_common.py` (shared helpers)
 
-Alongside them, three **non-enforcing** hooks run:
+Alongside them, these **non-enforcing** hooks run (the two algorithm hooks, experimental, are described under Steering: `.claude/hooks/nexus-algorithm-core.py` and `nexus-algorithm-reading.py`, both launching `nexus-management-algorithm.py`):
 
 - `.claude/hooks/nexus-session-writer.py` — archives the session transcript to `knowledge/sessions/session--<theme>--<YYYY-MM-DD>--<session-id8>.md`. It strips tool calls, tool results, thinking blocks and system-reminder tags, keeping only user prompts and assistant text. It rewrites the same file in place on every `Stop`, renaming it when `.nexus/session-theme.txt` changes **within the same session**, so a session stays one document; the date in the name is fixed at the first archive, so a session running past midnight keeps its name. It waits briefly (at most 1.65 s) for the final assistant record, which Claude Code flushes asynchronously, so the last answer of a session is archived too. The ownership marker `.nexus/session-file.txt` is session-scoped JSON — a different session never renames or overwrites an existing archive. Written docs carry `status: draft`, `source_of_truth: false`, `knowledge_visibility: historical` — they are an audit trail, never a source of truth. The hook is silent by design (no stdout, swallows its own exceptions) so it cannot interfere with the Exit Gate scheduled in the same event. It gates nothing and blocks nothing, and it has no spec by design: it enforces no contract, so there is no contract to mirror.
 
@@ -53,6 +53,22 @@ Read these on every session start (Session Bootstrap):
 5. When `process/charter.md` exists: `process/charter.md`, `process/navigation.md` and every `process/iteration--*.md` with `state: in_progress` (the project position; `knowledge/specs/spec--system--process-space.md` §8). The bootstrap hook lists them and the read ledger requires them, at session start and after compaction.
 
 ## Steering (experimental)
+
+At every `UserPromptSubmit`, three independent hook outputs provide the main agent with
+the canonical management algorithm (§§1–3, delivered as two separately bounded parts),
+the saved `Step:` / `Came from:` from `process/navigation.md`, and explicit instructions
+for interpreting the new user message in the current operation. The two algorithm
+parts are read directly from the same canonical specification; none is a file pointer
+that the agent must choose to open. Arrival order of hook outputs is not guaranteed.
+This delivery is an experiment of 2026-10-13 (Nexus 1.6.0): it gates nothing, and whether
+it changes behaviour is not yet shown (`knowledge/specs/spec--system--process-space.md` §8.3). `Step:` is the single recorded Program Counter:
+use `Step: <algorithm-node> of <Current-Objective> — <meaning>` when inside an
+objective, or `Step: <algorithm-node> — <meaning>` in the outer management cycle;
+`Came from:` records the last actual transition and its reason. Do not create
+another position copy. Neither reading the hook context nor ending a turn moves
+that position; update the two fields when an actual transition is justified.
+If they are missing or inconsistent, investigate under the algorithm's recovery
+operation instead of guessing. The hook does not enforce correct transitions.
 
 `process/charter.md` says what this project is for; `process/navigation.md` says where it stands. Since 2026-10-09 the bootstrap hook puts them in the Mandatory Startup Reading Set; using them is still yours to do. The net in the navigation describes position, dependencies and results. It grants no permissions: research needs no transition to begin, and a transition is added when work turns out to be a step of the route. The operator decides; you help hold the direction.
 
