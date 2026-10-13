@@ -171,6 +171,40 @@ class ManagementHookTest(unittest.TestCase):
         self.write_navigation('unknown now', 'unknown earlier')
         self.assertIn('PROGRAM COUNTER FORMAT UNCLEAR', self.invoke('main'))
 
+    def test_list_item_form_of_now_lines_is_read(self):
+        # Found by the first host on 1.6.0: its ## Now lines are list items,
+        # and its Step: puts a parenthesis, not a dash, after the objective.
+        for marker in ('- ', '* ', '  - '):
+            self.navigation.write_text(
+                '---\ntype: navigation\n---\n# Navigation\n\n## Now\n\n'
+                f'{marker}Position: test\n'
+                f'{marker}Heading: T1 — question → `process/iteration--test.md`\n'
+                f'{marker}Why here: test\n{marker}Ignoring: later work\n'
+                f'{marker}Step: 6б of T1 (оценка причины пересмотра): причина названа\n'
+                f'{marker}Came from: 5.4 of T1 завершена 2026-10-11: оценено\n\n## Net\n'
+                '- [ ] P1 a place whose text says Step: nothing\n',
+                encoding='utf-8',
+            )
+            content = self.invoke('main')
+            self.assertIn('Program Counter (node): 6б', content, marker)
+            self.assertIn('Current Objective: T1', content)
+            self.assertIn('Step (verbatim): 6б of T1 (оценка причины пересмотра): причина названа', content)
+            self.assertIn('Last transition (verbatim): 5.4 of T1 завершена 2026-10-11: оценено', content)
+            self.assertIn('process/iteration--test.md', content)
+
+    def test_unavailable_counter_names_the_defect(self):
+        text = self.navigation.read_text()
+        self.navigation.write_text(text.replace('## Now', '## Position'))
+        self.assertIn("no '## Now' section", self.invoke('main'))
+        self.navigation.write_text(text.replace('Came from: ', 'Arrived from: '))
+        self.assertIn("no 'Came from:' line", self.invoke('main'))
+        self.navigation.write_text(text.replace('\nStep: ', '\n- Step: again\nStep: '))
+        self.assertIn("2 'Step:' lines", self.invoke('main'))
+        self.navigation.write_text(re.sub(r'(?m)^Step: .*$', 'Step:', text))
+        content = self.invoke('main')
+        self.assertIn("an empty 'Step:' line", content)
+        self.assertIn('PROGRAM COUNTER UNAVAILABLE', content)
+
     def test_missing_algorithm_reports_both_parts(self):
         (self.root / ALGO).unlink()
         self.assertIn('ALGORITHM UNAVAILABLE', self.invoke('algorithm', 'core'))

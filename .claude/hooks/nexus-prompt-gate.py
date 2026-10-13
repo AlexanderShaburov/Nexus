@@ -120,22 +120,37 @@ def _read_utf8(root: pathlib.Path, relpath: str) -> tuple[str | None, str | None
         return None, f"{relpath}: {type(exc).__name__}: {exc}"
 
 
-def _now_fields(navigation: str) -> dict[str, str] | None:
-    """Read the existing six-line ## Now record, not the Petri-net prose."""
+def _now_fields(navigation: str) -> tuple[dict[str, str] | None, str | None]:
+    """Read Step:, Came from: and Heading: from ## Now, not the Petri-net prose.
+
+    A labelled line may be a bare paragraph (`Step: ...`) or a list item
+    (`- Step: ...`, `* Step: ...`); both satisfy process-space §6. Returns the
+    fields, or None with the precise defect: which label, and how many found.
+    """
     now = re.search(r"(?m)^## Now\s*$", navigation)
     if not now:
-        return None
+        return None, "it has no '## Now' section"
     rest = navigation[now.end():]
     next_section = re.search(r"(?m)^## \S", rest)
     if next_section:
         rest = rest[:next_section.start()]
     fields: dict[str, str] = {}
+    defects: list[str] = []
     for label in ("Step", "Came from", "Heading"):
-        matches = re.findall(rf"(?m)^{re.escape(label)}:[ \t]*(.*)$", rest)
-        if len(matches) != 1 or not matches[0].strip():
-            return None
-        fields[label] = matches[0].strip()
-    return fields
+        matches = re.findall(
+            rf"(?m)^[ \t]*(?:[-*+][ \t]+)?{re.escape(label)}:[ \t]*(.*)$", rest
+        )
+        if not matches:
+            defects.append(f"no '{label}:' line")
+        elif len(matches) > 1:
+            defects.append(f"{len(matches)} '{label}:' lines")
+        elif not matches[0].strip():
+            defects.append(f"an empty '{label}:' line")
+        else:
+            fields[label] = matches[0].strip()
+    if defects:
+        return None, "its ## Now has " + ", ".join(defects)
+    return fields, None
 
 
 def _saved_position(root: pathlib.Path) -> str:
@@ -150,11 +165,12 @@ def _saved_position(root: pathlib.Path) -> str:
     navigation, error = _read_utf8(root, MANAGEMENT_NAVIGATION)
     if error:
         return "PROGRAM COUNTER UNAVAILABLE — " + error
-    fields = _now_fields(navigation)
+    fields, defect = _now_fields(navigation)
     if fields is None:
         return (
             "PROGRAM COUNTER UNAVAILABLE — process/navigation.md must have "
-            "exactly one non-empty Step:, Came from: and Heading: in ## Now. "
+            "exactly one non-empty Step:, Came from: and Heading: in ## Now "
+            f"(as bare lines or list items); {defect}. "
             "Inspect the project before restoring its state; do not guess."
         )
 
