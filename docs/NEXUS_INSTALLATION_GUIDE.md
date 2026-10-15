@@ -48,7 +48,8 @@ or copy `nexus.py` from the Nexus repository once and run `python3 nexus.py --ap
 | It finds | It does |
 |---|---|
 | no Nexus | **install**: every Nexus-owned file from the manifest; your `CLAUDE.md`, `.claude/settings.json` and `.gitignore`, if present, are extended, never replaced; a fresh `CLAUDE.md` gets a project stub for you to fill |
-| Nexus files, no `.nexus/installed.json` | **retrofit**: guesses which release you have by matching files, records the baseline, marks anything you changed as customized, then updates |
+| Nexus files, no `.nexus/installed.json` (or an unreadable one) | **retrofit**: compares each Nexus file with every version Nexus ever shipped. Earlier Nexus content is updated; content Nexus never shipped is yours and is kept (a hook or tool you edited is a conflict to decide, and until then no hook, tool or `CLAUDE.md` section is replaced, so old and new runtime never mix). It says which release you have only when exactly one explains every file, otherwise "unknown"; the plan does not depend on it |
+| Old SOKI hooks (`soki-*.py`) | **refuses** and writes nothing: remove or rename them first |
 | Nexus with a baseline | **update** (Part 6a) |
 
 Dry-run first, always. `--apply` refuses on an uncommitted tree (`--allow-dirty` overrides) and while a Claude Code session looks live. Backups land under `.nexus/backups/`. It ends with the two things it cannot do for you: `/hooks` inside Claude Code, and `/project-ingest` for an existing project (Part 3).
@@ -382,7 +383,7 @@ python3 tools/nexus-update.py baseline --upstream https://github.com/AlexanderSh
 git add .nexus/installed.json
 ```
 
-`--guess` scores every release tag and recent commit by how many delivered files match yours and picks the best; files that match nothing are recorded as customized, never overwritten later.
+`--guess` scores every release tag and recent commit by how many delivered files match yours and picks the best; files that match nothing are recorded as customized, never overwritten later. A tie falls to the newest tag, so prefer `up` (Part 1), whose retrofit compares every file with the whole history of Nexus instead.
 
 Then, whenever you like:
 

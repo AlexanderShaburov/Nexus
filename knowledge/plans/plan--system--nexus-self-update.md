@@ -3,7 +3,7 @@ type: plan
 scope: system
 status: in-progress
 created: 2026-09-22
-updated: 2026-10-13
+updated: 2026-10-15
 source_of_truth: false
 knowledge_visibility: development
 plan_status: in_progress
@@ -366,6 +366,9 @@ Brief §9, plus what the repository added. Decisions recorded on 2026-09-22 are 
 9. **Live-session guard** (§7.2, last item): refuse `apply` when `state.json` changed in the last 60 s unless `--in-session`. Open.
 10. **Installer.** **Decided as a design requirement, not as scope:** a one-command install run inside the target folder is wanted later; the engine must serve it (§10a).
 11. **Feedback from hosts to Nexus.** **Decided: separate plan**, `plan--system--nexus-feedback-channel.md`; the updater only lends it the cache directory and the `feedback push` subcommand.
+
+
+Retrofit reworked (2026-10-15, prepared for the next release, not tagged): the first attempt to update `a_bot`, an installation older than baselines, showed the retrofit's flaw on a second host. The guess scored v1.4.0 to v1.6.1 equally (22 identical / 15 customized), the tie fell to the newest tag, and the plan would have recorded 1.6.1 while keeping 15 old Nexus files, five hooks among them, as "customized" beside new hooks and a new `settings.json`. The Liquid_Nexus retrofit of 2026-09-22 had shown the same thing (its conflicts "showed only stale Nexus wording") without the cause being named. The retrofit now decides per unit against the whole history of the repository (earlier Nexus content → update; content never shipped → kept, or a conflict for runtime code), reports the version only when one release explains every file, writes runtime code only as one coherent set, and reports four installation states. Contract: spec §8b; selftest T12, rehearsed on an archive of the template at `445dcd0` (June 2026), which the old retrofit also mis-scored.
 
 ---
 

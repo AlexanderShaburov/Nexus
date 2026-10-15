@@ -3,12 +3,12 @@ type: spec
 scope: system
 status: approved
 created: 2026-09-22
-updated: 2026-09-22
+updated: 2026-10-15
 source_of_truth: true
 knowledge_visibility: binding
 theme: nexus-self-update
 governs: [nexus.version, nexus.manifest.json, nexus.py, tools/nexus-update.py, .claude/hooks/nexus-update-check.py, .nexus/installed.json, .nexus/update-check.json, .nexus/unlock.txt]
-tags: [spec, self-update, manifest, baseline, three-way, cli]
+tags: [spec, self-update, manifest, baseline, three-way, cli, retrofit]
 ---
 
 ## Relations
@@ -80,14 +80,14 @@ A `sections` heading found twice, an index link target found twice, a hook regis
 
 ## 3. Install baseline
 
-`.nexus/installed.json` in a host: `baseline_version`, `nexus_version`, `installed_at`, `upstream {url, ref, commit}`, `origin` (`baseline` | `install` | `update`), and `units`: one record per compared unit with `strategy`, `sha256` of the content **as delivered upstream**, optional `mode`, optional `customized_at_baseline: true`.
+`.nexus/installed.json` in a host: `baseline_version`, `nexus_version`, `installed_at`, `upstream {url, ref, commit}`, `origin` (`baseline` | `install` | `update`), optional `retrofit {identified, at}` (§8b; kept by later updates as a record of how the baseline began), and `units`: one record per compared unit with `strategy`, `sha256` of the content **as delivered upstream**, optional `mode`, optional `customized_at_baseline: true`, optional `local_edit_at_retrofit: true` (§8b).
 
 Rules:
 
 - Written only by `baseline` and `apply` (*realized*; a future `install` is the same engine). Atomic write (temp + rename).
 - **Committed** by the host. It is shared repository state, not session state.
 - `baseline` never modifies any other file. A unit whose local content differs from upstream is recorded with the **upstream** SHA and `customized_at_baseline`, so the first `plan` reports it as `customized`, never as a clean update. Units absent locally are not recorded.
-- `baseline --guess` scores every `v*` tag and the last 50 commits of `main` by identical units and picks the best; the scores are printed so the operator can confirm.
+- `baseline --guess` scores every `v*` tag and the last 50 commits of `main` by identical units and picks the best; the scores are printed so the operator can confirm. A tie falls to the highest ref, so the pick is a guess, not an identification; `up` no longer uses it (§8b).
 
 ---
 
@@ -117,7 +117,7 @@ For every unit of the **target** manifest, with B = baseline SHA, L = local SHA,
 | absent | present | = L | `adopt` | record U |
 | absent | present | ≠ L | `unbaselined` | nothing; **blocking** |
 
-Plus `mode-drift` (a `replace` unit whose executable bit differs from the manifest) and `refused` (§2.2, **blocking**). `create-if-absent` and `ensure-lines` units appear only as `add` when missing. Units baselined under a path the target manifest no longer lists are `obsolete`.
+Plus `mode-drift` (a `replace` unit whose executable bit differs from the manifest), `refused` (§2.2, **blocking**) and `held` (§8b, **blocking**: an `update` or `add` row of runtime code or `CLAUDE.md` withheld because another hook or tool stays at non-target content). `create-if-absent` and `ensure-lines` units appear only as `add` when missing. Units baselined under a path the target manifest no longer lists are `obsolete`.
 
 `plan` writes nothing. Exit 0 when no blocking rows, 1 otherwise. `plan --diff <path>` prints the unified diff of that path's units, local against upstream. `plan --json` emits every row with all three SHAs.
 
@@ -165,11 +165,43 @@ Blocking rows are left alone and the run exits 1; everything else is applied. Wh
 The same engine serves installation and retrofit, so a host is never populated by hand-copying:
 
 - **`install`**: `apply` against an **empty baseline**. Every manifest unit is `add` (or `adopt` when identical content already exists, `unbaselined` when different content does). Two strategies behave specially when the local file is absent: `sections` writes a project stub (`# CLAUDE.md`, an explanatory sentence, an empty `## What this repository is`) followed by the owned sections, never the template's own project text; `index-entries` writes the template's index minus bullet lines that link to documents Nexus does not deliver. `hooks-merge` on an absent file writes the upstream file wholesale. The baseline is written with `origin: install`. Refuses (exit 2) where `.claude/hooks/nexus-bootstrap.py` already exists unless `--force`. Undelivered classes (`plans/`, `sessions/`, `feedback/`, history) never appear in the host.
-- **`up`**: one command for any directory. No Nexus → `install`. Nexus without `installed.json` → **retrofit**: `baseline --guess` over every `v*` tag and recent `main` commits, the baseline written (`--apply` only), then `apply`; units that differ from the guessed release are `customized` and left alone. Baseline present → `apply`. All three are dry-run unless `--apply`.
+- **`up`**: one command for any directory. It first reports what it found (§8b, four states), then: not installed → `install`; installed with a readable `installed.json` → `apply`; installed without one, or damaged → **retrofit** (§8b); a legacy SOKI runtime → refused, nothing written. All are dry-run unless `--apply`.
 - **Clean-tree guard**: with `--apply`, `install` and `up` refuse when `git status --porcelain` (tracked files) is non-empty, so the change lands as one commit; `--allow-dirty` overrides. The live-session guard of §8 applies as well.
 - **What the tooling cannot do** is printed at the end of an install: run `/hooks` inside Claude Code, run `/project-ingest` for an existing project, describe the project in `CLAUDE.md`.
 - **`nexus.py`** at the template root is the one-file bootstrap for a directory that has no updater yet: it ensures `git`, clones or fetches the cache, selects the highest `v*` tag (or `--ref`), extracts `tools/nexus-update.py` from that tag into a temporary file and runs it with `up` and all remaining arguments. It refuses a tag whose updater predates `up`. A local checkout may be given as `--upstream` (its working tree, or `--ref` inside it). Template-only; stdlib only.
 - **Validation of undelivered links**: because `plans/` and `sessions/` are not shipped, `validate-vault.py` reports a dangling link into either as a **warning** (`LK002`), not an error; every other broken link stays `LK001`. Post-install validation therefore passes in a host that received binding documents citing template plans.
+
+## 8b. Retrofit of installations without a baseline (*realized*)
+
+Every host installed before baselines existed, or by copying files, has Nexus files and no `installed.json`. Choosing one release that "best matches" the files and treating every other difference as the project's own was wrong twice over: a tie between releases fell to the newest tag, so an old installation was recorded as current; and every old Nexus file then counted as `customized` and stayed, so new hooks were installed beside old ones (found 2026-10-15 in `a_bot`: 22 identical / 15 customized for every tag from v1.4.0 to v1.6.1, baseline recorded as 1.6.1). The retrofit therefore decides **per unit against the whole history of Nexus**, and never needs to know the version.
+
+**Detection** (`detect_installation`, reads only). Four signal groups: Nexus hook files (`nexus-*.py`, `_nexus_common.py`), `nexus-*` registrations in `.claude/settings.json`, the `.nexus/` directory, and the three vault signatures (navigation index, session-bootstrap spec, lifecycle-gates invariant). States:
+
+| State | Condition | `up` does |
+|---|---|---|
+| `absent` / `traces` | no group / one group other than hooks | install (files that differ are `unbaselined`, never written) |
+| `baselined` | `installed.json` readable | update (§8) |
+| `unbaselined` | Nexus hooks present, or two groups, no `installed.json` | retrofit |
+| `damaged` | as above with defects: unreadable `installed.json` (backed up, rebuilt), `nexus-bootstrap.py` missing, `settings.json` unreadable, a registered hook without its file, no registration | retrofit, which re-adds what is missing; defects are listed |
+| `ambiguous` | `soki-*` hooks, their registrations or `.soki/` | refused with exit 1, nothing written: the pre-rename gates would run beside the Nexus gates |
+
+**History.** The retrofit reads, with one `git log --all --raw` and one `git cat-file --batch`, every content each unit of the target manifest has had in any commit of the upstream repository (the cache clone carries all of it). Per unit of the target:
+
+| Local content | Baseline recorded | Row in §5 | `apply` |
+|---|---|---|---|
+| absent | none | `add` | written |
+| = target | target SHA | `unchanged` | nothing |
+| = some earlier Nexus content (**earlier**) | the local SHA | `update` | written: Nexus shipped it and the project never edited it |
+| shipped by no commit (**local-edit**), document, section, index entry, hook registration | target SHA + `customized_at_baseline` | `customized` | kept |
+| shipped by no commit, runtime code (`hooks`, `tools` groups) | `RETROFIT_LOCAL_EDIT` (64 zeros, which no content hashes to) + `local_edit_at_retrofit` | `conflict` | kept; decision required |
+
+**Version.** Reported, never assumed: a release tag *explains* the installation when no local unit carries Nexus content from a different commit (local edits do not count against it). Exactly one such tag → "identified from file contents"; several or none → `unknown`, with the date of the newest Nexus content found. The plan does not depend on it. The baseline records `nexus_version` as the identified version or `0.0.0`, and `retrofit.identified`.
+
+**Runtime as one set** (`hold_runtime`, also in `plan` and in every `apply`). When a hook or tool stays at non-target content (`conflict`, `customized`, `unbaselined`) and is neither restored with `--restore` nor listed in `.nexus/unlock.txt`, every `update` and `add` row of the `hooks` and `tools` groups and of `CLAUDE.md` (which tells the agent how the gates behave) becomes `held`: not written, baseline unchanged, listed with the cause and the two ways out. A `--restore` of runtime code is itself held while another cause remains. The vault still updates.
+
+**Writing.** The retrofit baseline is written by `apply` together with the files, even when no file changes; the previous `installed.json`, readable or not, goes to the backup. Post-apply validation separates defects the project already had (reported as *still present*) from defects the run introduced (exit 5).
+
+**Re-run.** After a retrofit the host is `baselined`; a second `up --apply` reports `Nothing to write`, writes nothing and leaves the git tree clean, unless held rows still wait for a decision.
 
 ## 9. Exit codes
 
@@ -187,4 +219,4 @@ The same engine serves installation and retrofit, so a host is never populated b
 
 ## 10. Selftest
 
-`tools/nexus-update.py --selftest` MUST pass before a release is tagged. It builds a fixture template, proves every generation rule (T1), every extractor including refusal cases (T2), `manifest verify` (T3), `baseline` and `status` (T4), reading from a git ref (T5), every row of §5 against a fixture 1.1.0 release (T7), the cache clone, ref selection, `--guess`, `check` and `plan` through the CLI including the unreachable path (T8), `apply` on that host: dry-run writes nothing, clean rows written, blocking and customized rows untouched, backups taken, baseline recorded per §8, second run a no-op, `--restore` per path, the live-session guard, and the `hooks-merge` writer (T9), the feedback mailbox end to end (T10), `install` into an empty directory and into a project with its own `CLAUDE.md` / `settings.json` / `.gitignore`, the clean-tree guard, the retrofit of a `v1.0.0` archive with a customization, `up` as a no-op afterwards, and `nexus.py` from the cache and from a local checkout (T11), and finally that the real template's manifest is in sync (T6). The core freeze is proven by piping PreToolUse JSON into the gate (implementation report, rows B15–B17).
+`tools/nexus-update.py --selftest` MUST pass before a release is tagged. It builds a fixture template, proves every generation rule (T1), every extractor including refusal cases (T2), `manifest verify` (T3), `baseline` and `status` (T4), reading from a git ref (T5), every row of §5 against a fixture 1.1.0 release (T7), the cache clone, ref selection, `--guess`, `check` and `plan` through the CLI including the unreachable path (T8), `apply` on that host: dry-run writes nothing, clean rows written, blocking and customized rows untouched, backups taken, baseline recorded per §8, second run a no-op, `--restore` per path, the live-session guard, and the `hooks-merge` writer (T9), the feedback mailbox end to end (T10), `install` into an empty directory and into a project with its own `CLAUDE.md` / `settings.json` / `.gitignore`, the clean-tree guard, the retrofit of a `v1.0.0` archive with a customization, `up` as a no-op afterwards, and `nexus.py` from the cache and from a local checkout (T11), the retrofit of §8b against a fixture 1.2.0 that changes runtime code (T12: the detection states; an old installation identified and brought to 1.2.0 with nothing marked customized; a second run that changes nothing; an untagged installation reported as `unknown` with its edited documents kept; old hooks under a new `settings.json` with one edited hook, held until `--restore` and then released at once with a backup; an unreadable baseline and a deleted hook repaired; a SOKI runtime refused), and finally that the real template's manifest is in sync (T6). The core freeze is proven by piping PreToolUse JSON into the gate (implementation report, rows B15–B17).

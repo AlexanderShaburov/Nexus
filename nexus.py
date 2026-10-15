@@ -16,8 +16,10 @@ What it does, and nothing more:
   4. extracts tools/nexus-update.py from that tag into a temporary file and runs
      `nexus-update.py up` here, passing every argument through.
 
-`up` decides: no Nexus here → install; Nexus without .nexus/installed.json →
-retrofit (guess the installed version, record it, update); baseline → update.
+`up` reports what it found and decides: no Nexus here → install; Nexus without a
+(readable) .nexus/installed.json → retrofit (each file compared with the whole
+history of Nexus: earlier Nexus content is updated, local edits are kept or
+raised as conflicts, the baseline is recorded); baseline → update.
 Dry-run by default. After a first install the project carries its own
 tools/nexus-update.py and `python3 tools/nexus-update.py up` does the same.
 

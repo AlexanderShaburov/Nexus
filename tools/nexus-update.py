@@ -12,7 +12,7 @@ knowledge/specs/spec--system--nexus-update.md. Subcommands:
     plan                  (host)     the full three-way table: baseline / local / upstream
     apply                 (host)     adopt the target version; dry-run unless --apply
     install               (any dir)  install Nexus where there is none; dry-run unless --apply
-    up                    (any dir)  install / retrofit / update, auto-detected; dry-run unless --apply
+    up                    (any dir)  install / retrofit / update, auto-detected (spec §8b); dry-run unless --apply
     feedback status|push  (host)     feedback notes about Nexus → the local mailbox in the cache
     feedback list|show|archive (template) triage the mailbox
     --selftest                       prove the rules, the extractors, the table, apply and feedback
@@ -66,13 +66,14 @@ COMPARED_STRATEGIES = {"replace", "sections", "index-entries", "hooks-merge"}
 # Group order is the order `apply` will write in (plan §7.4).
 GROUP_ORDER = ["repo", "runtime", "vault-config", "vault", "instructions", "tools", "hooks"]
 
-# Three-way classes (plan §7.1), in report order. The first three block `apply`.
+# Three-way classes (plan §7.1), in report order. The first four block `apply`; `held`
+# is added after the table by hold_runtime (spec §8b), never by classify.
 PLAN_CLASSES = [
-    "conflict", "unbaselined", "refused",
+    "conflict", "unbaselined", "refused", "held",
     "update", "add", "converged", "adopt",
     "customized", "removed-locally", "obsolete", "mode-drift", "unchanged",
 ]
-BLOCKING_CLASSES = {"conflict", "unbaselined", "refused"}
+BLOCKING_CLASSES = {"conflict", "unbaselined", "refused", "held"}
 
 NEVER_TOUCH = [
     ".nexus/state*.json",
@@ -776,6 +777,272 @@ def guess_ref(project: WorkTree, repo: pathlib.Path, url: str | None) -> list[tu
     return scores
 
 
+# --------------------------------------------------------------------------
+# Retrofit of installations without a baseline (spec §8b)
+# --------------------------------------------------------------------------
+
+# Baseline marker for runtime code Nexus never shipped: no content hashes to it, so the
+# unit classifies as `conflict` until the operator restores or unlocks it.
+RETROFIT_LOCAL_EDIT = "0" * 64
+RUNTIME_GROUPS = {"hooks", "tools"}
+# CLAUDE.md tells the agent how the gates behave, so its sections move with the runtime.
+HELD_GROUPS = RUNTIME_GROUPS | {"instructions"}
+LEGACY_HOOK_RE = re.compile(r"/\.claude/hooks/(soki-[A-Za-z0-9_-]+\.py)$")
+VAULT_SIGNATURES = (
+    "knowledge/index/index--system--project-navigation.md",
+    "knowledge/specs/spec--system--session-bootstrap.md",
+    "knowledge/invariants/invariant--system--lifecycle-gates.md",
+)
+
+
+def git_blob_id(data: bytes) -> str:
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def _cat_blobs(repo: pathlib.Path, ids: list[str]) -> dict[str, bytes]:
+    if not ids:
+        return {}
+    r = subprocess.run(["git", "-C", str(repo), "cat-file", "--batch"], input=("\n".join(ids) + "\n").encode(),
+                       capture_output=True, env=GIT_ENV, timeout=GIT_TIMEOUT)
+    if r.returncode != 0:
+        return {}
+    out, pos, blobs = r.stdout, 0, {}
+    while pos < len(out):
+        nl = out.index(b"\n", pos)
+        head = out[pos:nl].decode().split()
+        pos = nl + 1
+        if len(head) < 3 or head[1] != "blob":
+            continue
+        size = int(head[2])
+        blobs[head[0]] = out[pos:pos + size]
+        pos += size + 1
+    return blobs
+
+
+class NexusHistory:
+    """Every content each unit of a manifest has had in any commit of the Nexus repository.
+
+    A retrofit asks it, unit by unit, whether local content is earlier Nexus content (safe to
+    update) or content Nexus never shipped (a local edit), so no single guessed release decides.
+    """
+
+    def __init__(self, repo: pathlib.Path | None, manifest: dict):
+        self.available = False
+        self.seen: dict[str, dict[str, tuple[str, str]]] = {}  # unit id -> {hash: (date, commit)}, oldest first
+        if repo is None:
+            return
+        entries = {e["path"]: e for e in manifest["entries"] if e["strategy"] in COMPARED_STRATEGIES}
+        owned = {e["path"] for e in manifest["entries"]}
+        try:
+            out = git(repo, "log", "--all", "--reverse", "-m", "--root", "--raw", "--no-abbrev", "--no-renames",
+                      "--format=C %H %ad", "--date=short", "--", *sorted(entries), timeout=300)
+        except UpdaterError:
+            return
+        first: dict[tuple[str, str], tuple[str, str]] = {}  # (path, blob) -> (date, commit)
+        when = ("", "")
+        for line in out.splitlines():
+            if line.startswith("C "):
+                _, commit, date = line.split()
+                when = (date, commit[:10])
+            elif line.startswith(":"):
+                meta, _, path = line.partition("\t")
+                blob = meta.split()[3]
+                if path in entries and set(blob) != {"0"}:
+                    first.setdefault((path, blob), when)
+        multi = sorted({b for (p, b) in first if entries[p]["strategy"] != "replace"})
+        contents = _cat_blobs(repo, multi)
+        for (path, blob), w in first.items():
+            entry = entries[path]
+            if entry["strategy"] == "replace":
+                self.seen.setdefault(path, {}).setdefault(blob, w)
+                continue
+            try:
+                units = units_of(entry, contents.get(blob), owned)
+            except UpdaterError:
+                continue
+            for uid, data in units.items():
+                self.seen.setdefault(uid, {}).setdefault(sha256_bytes(data), w)
+        self.available = bool(first)
+
+    def knows(self, uid: str, strategy: str, content: bytes) -> tuple[str, str] | None:
+        """(date, commit) where Nexus first shipped this content of the unit, or None."""
+        key = git_blob_id(content) if strategy == "replace" else sha256_bytes(content)
+        return self.seen.get(uid, {}).get(key)
+
+
+def detect_installation(root: pathlib.Path) -> dict:
+    """Which of the four states the directory is in (spec §8b). Reads only."""
+    hooks_dir = root / ".claude" / "hooks"
+    hooks = sorted(p.name for p in hooks_dir.glob("nexus-*.py")) if hooks_dir.is_dir() else []
+    if (hooks_dir / "_nexus_common.py").is_file():
+        hooks.append("_nexus_common.py")
+    legacy = sorted(p.name for p in hooks_dir.glob("soki-*.py")) if hooks_dir.is_dir() else []
+    if (root / ".soki").exists():
+        legacy.append(".soki/")
+    registrations: list[str] = []
+    settings_error = None
+    settings = root / ".claude" / "settings.json"
+    if settings.is_file():
+        raw = settings.read_bytes()
+        try:
+            registrations = [k.partition("#")[2] for k in units_of(
+                {"path": ".claude/settings.json", "strategy": "hooks-merge"}, raw, set())]
+            cfg = json.loads(raw.decode("utf-8"))
+            legacy += sorted({m.group(1) + " (registered)" for groups in (cfg.get("hooks") or {}).values()
+                              if isinstance(groups, list) for g in groups for h in g.get("hooks") or []
+                              if (m := LEGACY_HOOK_RE.search(str(h.get("command", ""))))})
+        except UpdaterError as e:
+            settings_error = str(e)
+    vault = [p for p in VAULT_SIGNATURES if (root / p).is_file()]
+    baseline, baseline_error = "absent", None
+    if (root / INSTALLED_FILE).is_file():
+        try:
+            load_installed(root)
+            baseline = "valid"
+        except UpdaterError as e:
+            baseline, baseline_error = "invalid", str(e)
+    signals = {"hooks": hooks, "registrations": registrations,
+               "runtime": [".nexus/"] if (root / ".nexus").is_dir() else [], "vault": vault}
+    present = [k for k, v in signals.items() if v]
+    defects: list[str] = []
+    if baseline == "valid":
+        state = "baselined"
+    elif legacy:
+        state = "ambiguous"
+    elif hooks or len(present) >= 2 or baseline == "invalid":
+        if baseline == "invalid":
+            defects.append(f"{INSTALLED_FILE} is unreadable ({baseline_error}); it is backed up and rebuilt")
+        if "nexus-bootstrap.py" not in hooks:
+            defects.append(".claude/hooks/nexus-bootstrap.py is missing")
+        if settings_error:
+            defects.append(f".claude/settings.json: {settings_error}")
+        for key in registrations:
+            name = key.partition("/")[2]
+            if name not in hooks:
+                defects.append(f"settings.json registers {key} but the file is missing")
+        if not registrations and not settings_error:
+            defects.append("no Nexus hook is registered in .claude/settings.json")
+        state = "damaged" if defects else "unbaselined"
+    elif present:
+        state = "traces"
+    else:
+        state = "absent"
+    return {"state": state, "signals": signals, "legacy": legacy, "defects": defects}
+
+
+def identify_version(project: WorkTree, repo: pathlib.Path, url: str | None, history: NexusHistory) -> list[str]:
+    """Release tags that explain every piece of Nexus content found locally.
+
+    A tag qualifies when no local unit carries Nexus content of a *different* commit; local
+    edits (content Nexus never shipped) do not disqualify it. One tag → the version is known
+    from content; several or none → unknown. Never a tie broken by recency.
+    """
+    consistent: list[str] = []
+    for _, tag in version_tags(repo):
+        try:
+            src = GitRef(repo, f"refs/tags/{tag}", url=url)
+            manifest = read_manifest_from(src)
+        except UpdaterError:
+            continue
+        owned = {e["path"] for e in manifest["entries"]}
+        match = other = 0
+        for entry in manifest["entries"]:
+            if entry["strategy"] not in COMPARED_STRATEGIES:
+                continue
+            try:
+                up_units = units_of(entry, src.read(entry["path"]), owned)
+                local_units = units_of(entry, project.read(entry["path"]), owned)
+            except UpdaterError:
+                continue
+            for uid, content in local_units.items():
+                if up_units.get(uid) == content:
+                    match += 1
+                elif history.knows(uid, entry["strategy"], content):
+                    other += 1
+        if match and not other:
+            consistent.append(tag)
+    return consistent
+
+
+def compute_retrofit_baseline(project: WorkTree, upstream: WorkTree | GitRef, manifest: dict,
+                              history: NexusHistory, version: str, identified: str) -> tuple[dict, dict]:
+    """A baseline for an installation that has none, decided unit by unit against the history.
+
+    current    local = target            → baseline = target (unchanged)
+    earlier    local = some Nexus commit → baseline = local  (update: never edited here)
+    local-edit local = nothing Nexus shipped
+               documents, sections, entries → baseline = target, customized_at_baseline (kept)
+               runtime code (hooks, tools)  → RETROFIT_LOCAL_EDIT (conflict: decision required)
+    absent     not recorded              → add
+    """
+    owned = {e["path"] for e in manifest["entries"]}
+    units: dict[str, dict] = {}
+    inv: dict = {"current": [], "earlier": [], "local-edit": [], "absent": [], "refused": [], "newest": None}
+    for entry in manifest["entries"]:
+        strategy = entry["strategy"]
+        if strategy not in COMPARED_STRATEGIES:
+            continue
+        path = entry["path"]
+        try:
+            up_units = units_of(entry, upstream.read(path), owned)
+            local_units = units_of(entry, project.read(path), owned)
+        except UpdaterError as e:
+            inv["refused"].append(f"{path}: {e}")
+            continue
+        for uid, up_content in up_units.items():
+            local = local_units.get(uid)
+            if local is None:
+                inv["absent"].append(uid)
+                continue
+            rec: dict = {"strategy": strategy, "sha256": sha256_bytes(up_content)}
+            if entry.get("mode"):
+                rec["mode"] = entry["mode"]
+            if local == up_content:
+                inv["current"].append(uid)
+            elif (seen := history.knows(uid, strategy, local)) is not None:
+                rec["sha256"] = sha256_bytes(local)
+                inv["earlier"].append(uid)
+                if inv["newest"] is None or seen[0] > inv["newest"][0]:
+                    inv["newest"] = seen
+            elif strategy == "replace" and entry.get("group") in RUNTIME_GROUPS:
+                rec["sha256"] = RETROFIT_LOCAL_EDIT
+                rec["local_edit_at_retrofit"] = True
+                inv["local-edit"].append(uid)
+            else:
+                rec["customized_at_baseline"] = True
+                inv["local-edit"].append(uid)
+            units[uid] = rec
+    installed = {
+        "baseline_version": BASELINE_VERSION,
+        "nexus_version": version,
+        "installed_at": now_iso(),
+        "upstream": upstream.describe(),
+        "origin": "baseline",
+        "retrofit": {"identified": identified, "at": now_iso()},
+        "units": dict(sorted(units.items())),
+    }
+    return installed, inv
+
+
+def hold_runtime(rows: dict[str, list[dict]], manifest: dict, keep: set[str]) -> list[dict]:
+    """Runtime code is delivered as one coherent set (spec §8b).
+
+    When a hook or tool stays at content other than the target's (conflict, customized,
+    unbaselined) and is neither restored nor unlocked (`keep`), every other runtime write, and
+    every write to CLAUDE.md, which describes the runtime to the agent, moves to `held`: old and
+    new hooks never run side by side. Returns the rows that cause it.
+    """
+    groups = {e["path"]: e.get("group") for e in manifest["entries"]}
+    causes = [r for c in ("conflict", "customized", "unbaselined") for r in rows[c]
+              if groups.get(r["path"]) in RUNTIME_GROUPS and r["path"] not in keep]
+    if causes:
+        for cls in WRITE_CLASSES:
+            stay = [r for r in rows[cls] if groups.get(r["path"]) not in HELD_GROUPS]
+            rows["held"] += [r for r in rows[cls] if groups.get(r["path"]) in HELD_GROUPS]
+            rows[cls] = stay
+    return causes
+
+
 def load_installed(project: pathlib.Path) -> dict:
     p = project / INSTALLED_FILE
     if not p.is_file():
@@ -1148,11 +1415,15 @@ def live_session_recent(project_root: pathlib.Path) -> bool:
     return (time.time() - p.stat().st_mtime) < LIVE_SESSION_SECONDS
 
 
-def run_post_apply_validation(project_root: pathlib.Path) -> list[str]:
-    """spec §8: vault clean, validator selftest, hooks compile, settings.json sane."""
+def run_post_apply_validation(project_root: pathlib.Path, runtime_only: bool = False) -> list[str]:
+    """spec §8: vault clean, validator selftest, hooks compile, settings.json sane.
+
+    runtime_only skips the vault validator; apply uses it before writing, to tell defects the
+    project already had from defects the run introduced.
+    """
     problems: list[str] = []
     validator = project_root / "tools" / "validate-vault.py"
-    if validator.is_file():
+    if validator.is_file() and not runtime_only:
         for extra in ([], ["--selftest"]):
             r = subprocess.run([sys.executable, str(validator), "--root", str(project_root), *extra],
                                capture_output=True, text=True, cwd=str(project_root), timeout=300)
@@ -1275,6 +1546,8 @@ def compute_apply(project: WorkTree, installed: dict, upstream: WorkTree | GitRe
         "origin": "install" if installed.get("origin") == "empty" else "update",
         "units": dict(sorted(units.items())),
     }
+    if installed.get("retrofit"):
+        new_installed["retrofit"] = installed["retrofit"]
     return ops, new_installed
 
 
@@ -1804,6 +2077,7 @@ def cmd_plan(args) -> int:
 
     rows = three_way(project, installed, source, manifest)
     unlock = set(load_unlock(project_root))
+    causes = hold_runtime(rows, manifest, unlock)
     blocking = sum(len(rows[c]) for c in BLOCKING_CLASSES)
     if args.as_json:
         print(json.dumps({"installed": have, "target": version, "upstream": source.describe(),
@@ -1818,6 +2092,7 @@ def cmd_plan(args) -> int:
         "conflict": "host and upstream both changed; nothing will be written (unlock + hand-merge, or --restore)",
         "unbaselined": "present locally without a baseline and differs from upstream; run baseline first",
         "refused": "cannot be parsed safely; left alone",
+        "held": "runtime held back: another hook or tool stays at non-target content (see below)",
         "update": "untouched by the host, changed upstream; will be written",
         "add": "new upstream; will be created",
         "converged": "host already made the upstream change; baseline will be recorded",
@@ -1838,12 +2113,24 @@ def cmd_plan(args) -> int:
             print(f"    {r['unit']}{mark}{extra}")
     if rows["unchanged"] and not args.verbose:
         print(f"--- unchanged ({len(rows['unchanged'])}): identical everywhere (--verbose lists them)")
+    print_held(causes, rows)
     print()
     if blocking:
         print(f"{blocking} blocking row(s). `apply` will still update the clean rows and leave these alone.")
     else:
         print("No blocking rows. This was a plan; nothing has been written.")
     return 1 if blocking else 0
+
+
+def print_held(causes: list[dict], rows: dict[str, list[dict]]) -> None:
+    if not causes:
+        return
+    print(f"\nRUNTIME HELD BACK: {len(rows['held'])} hook, tool and CLAUDE.md write(s) wait, because these stay at content "
+          "other than the target's and old and new runtime code must not run side by side:")
+    for r in causes:
+        print(f"    {r['path']}")
+    print("  Decide each one: `--restore <path>` takes the target version (yours is backed up), or list the path "
+          f"in {UNLOCK_FILE} to keep yours deliberately. Inspect with `plan --diff <path>`.")
 
 
 def cmd_apply(args) -> int:
@@ -1860,8 +2147,12 @@ def cmd_apply(args) -> int:
 
 def perform_apply(project_root: pathlib.Path, installed: dict, source: WorkTree | GitRef, manifest: dict,
                   version: str, *, do_apply: bool, restore: set[str], backup_dir: str | None,
-                  in_session: bool, allow_downgrade: bool, title: str) -> int:
-    """The write half shared by apply, install and up (spec §8)."""
+                  in_session: bool, allow_downgrade: bool, title: str, retrofit_from: str | None = None) -> int:
+    """The write half shared by apply, install and up (spec §8).
+
+    retrofit_from labels a baseline built by the retrofit (spec §8b); it is written even when
+    no file changes, since recording it is the point of the run.
+    """
     project = WorkTree(project_root)
     have = installed["nexus_version"]
     installing = installed.get("origin") == "empty"
@@ -1881,6 +2172,11 @@ def perform_apply(project_root: pathlib.Path, installed: dict, source: WorkTree 
     if unknown:
         print("ERROR: --restore path(s) not in the target manifest: " + ", ".join(unknown), file=sys.stderr)
         return 1
+    causes = hold_runtime(rows, manifest, restore | set(load_unlock(project_root)))
+    if causes:
+        # A restore of runtime code or CLAUDE.md would itself mix versions while another stays behind.
+        groups = {e["path"]: e.get("group") for e in manifest["entries"]}
+        restore = {p for p in restore if groups.get(p) not in HELD_GROUPS}
     ops, new_installed = compute_apply(project, installed, source, manifest, rows, restore)
     # Rows restored in this run are no longer blocking.
     blocking = sum(1 for c in BLOCKING_CLASSES for r in rows[c]
@@ -1888,10 +2184,11 @@ def perform_apply(project_root: pathlib.Path, installed: dict, source: WorkTree 
     hooks_touched = any(o["group"] == "hooks" for o in ops)
     mode = "APPLY" if do_apply else "DRY-RUN"
 
-    head = f"install Nexus {version}" if installing else f"{have} → {version}"
+    head = f"install Nexus {version}" if installing else f"{retrofit_from or have} → {version}"
     print(f"=== Nexus {title}: {head} ({d['url']} @ {d['ref']})  mode: {mode} ===")
     print("  " + "  ".join(f"{c}={len(rows[c])}" for c in PLAN_CLASSES if rows[c]))
-    nothing_to_write = not ops and new_installed["units"] == installed["units"] and version == have
+    nothing_to_write = not ops and new_installed["units"] == installed["units"] and version == have \
+        and retrofit_from is None
     print()
     verb = {"create": "created", "write": "written", "chmod": "chmod"} if do_apply else \
            {"create": "WOULD CREATE", "write": "WOULD WRITE", "chmod": "WOULD CHMOD"}
@@ -1899,12 +2196,13 @@ def perform_apply(project_root: pathlib.Path, installed: dict, source: WorkTree 
         tag = "  [restore]" if o["restore"] else ""
         detail = "" if o["strategy"] in ("replace", "create-if-absent") else f"  ({len(o['units'])} unit(s))"
         print(f"  [{verb[o['action']]:12}] {o['group']:12} {o['path']}{detail}{tag}")
-    for cls in ("conflict", "unbaselined", "refused", "customized", "removed-locally", "obsolete"):
+    for cls in ("conflict", "unbaselined", "refused", "held", "customized", "removed-locally", "obsolete"):
         for r in rows[cls]:
             if r["path"] in restore and cls in RESTORE_CLASSES:
                 continue
             extra = f"  ({r['reason']})" if r.get("reason") else ""
             print(f"  [{cls:12}] {r['unit']}{extra}  (left alone)")
+    print_held(causes, rows)
 
     if nothing_to_write:
         print("\nNothing to write: every unit is either current or deliberately left alone.")
@@ -1913,6 +2211,7 @@ def perform_apply(project_root: pathlib.Path, installed: dict, source: WorkTree 
         print(f"\nThis was a DRY-RUN: {len(ops)} file(s) would change. Re-run with --apply to write them.")
         return 1 if blocking else 0
 
+    preexisting = run_post_apply_validation(project_root, runtime_only=True)
     # Backups before the first write.
     ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     bdir = pathlib.Path(backup_dir).resolve() if backup_dir \
@@ -1938,7 +2237,10 @@ def perform_apply(project_root: pathlib.Path, installed: dict, source: WorkTree 
     print(f"\n  backup:    {bdir}" if any(o["exists"] for o in ops) else "\n  backup:    nothing pre-existing to back up")
     print(f"  baseline:  {INSTALLED_FILE} {'written' if installing else 'rewritten'} "
           f"({len(new_installed['units'])} units, Nexus {new_installed['nexus_version']})")
-    problems = run_post_apply_validation(project_root)
+    problems = [p for p in run_post_apply_validation(project_root) if p not in preexisting]
+    still = [p for p in preexisting if p in run_post_apply_validation(project_root, runtime_only=True)]
+    for p in still:
+        print(f"  still present (the project had it before this run): {p}")
     if problems:
         print("\nPOST-APPLY VALIDATION FAILED:", file=sys.stderr)
         for p in problems:
@@ -1980,11 +2282,38 @@ def cmd_install(args) -> int:
                          allow_downgrade=True, title="install")
 
 
+STATE_LABELS = {
+    "absent": "Nexus is not installed here",
+    "traces": "Nexus is not installed here (isolated traces only; files that differ are left alone)",
+    "baselined": "Nexus is installed; its version is recorded in " + INSTALLED_FILE,
+    "unbaselined": "Nexus is installed without " + INSTALLED_FILE + "; the version is not recorded",
+    "damaged": "Nexus is installed but damaged",
+    "ambiguous": "ambiguous: a legacy SOKI runtime is present",
+}
+
+
+def print_detection(det: dict) -> None:
+    print(f"Detected: {STATE_LABELS[det['state']]}.")
+    found = [f"{k}: {', '.join(v)}" for k, v in det["signals"].items() if v]
+    for line in found:
+        print(f"  {line}")
+    for d in det["defects"]:
+        print(f"  defect: {d}")
+    for item in det["legacy"]:
+        print(f"  legacy: {item}")
+    print()
+
+
 def cmd_up(args) -> int:
-    """One command for any directory: install, retrofit (baseline --guess + apply) or update."""
+    """One command for any directory: install, retrofit (spec §8b) or update."""
     project_root = pathlib.Path(args.project_root).resolve()
-    has_nexus = (project_root / ".claude" / "hooks" / "nexus-bootstrap.py").is_file()
-    has_baseline = (project_root / INSTALLED_FILE).is_file()
+    det = detect_installation(project_root)
+    print_detection(det)
+    if det["state"] == "ambiguous":
+        print("ERROR: SOKI hooks predate the Nexus rename (2026-04-22) and would run beside the Nexus gates. "
+              "Remove or rename them and their settings.json entries by hand, commit, and run again. "
+              "Nothing has been written.", file=sys.stderr)
+        return 1
     if args.apply and not args.allow_dirty:
         dirty = git_tree_dirty(project_root)
         if dirty:
@@ -1992,54 +2321,68 @@ def cmd_up(args) -> int:
                   "change is one clean commit, or pass --allow-dirty.", file=sys.stderr)
             return 1
 
-    if not has_nexus:
-        print("Nexus not found here → install.\n")
+    if det["state"] in ("absent", "traces"):
+        print("→ install.\n")
         args.force = False
         args.allow_dirty = True  # checked above
         return cmd_install(args)
 
-    if has_baseline:
-        print("Nexus with a baseline → update.\n")
+    if det["state"] == "baselined":
+        print("→ update.\n")
         installed = load_installed(project_root)
         source, manifest, version = _open_target(args, installed)
         return perform_apply(project_root, installed, source, manifest, version, do_apply=args.apply,
                              restore=set(args.restore or []), backup_dir=args.backup_dir,
                              in_session=args.in_session, allow_downgrade=args.allow_downgrade, title="update")
 
-    # Retrofit: Nexus files exist but nothing records what was delivered.
-    print("Nexus without a baseline → retrofit: guess the installed version, record it, then update.\n")
+    # Retrofit: Nexus files exist but nothing (readable) records what was delivered.
+    print("→ retrofit: compare every Nexus file here with the whole history of Nexus, record a baseline, update.\n")
     spec = args.upstream or DEFAULT_UPSTREAM
     project = WorkTree(project_root)
     if is_local_dir(spec):
         repo, url = pathlib.Path(spec).expanduser(), None
     else:
         repo, url = ensure_cache(spec, offline=args.offline), spec
-    scores = guess_ref(project, repo, url)
-    if not scores:
-        raise UpdaterError("no candidate ref carries a manifest; cannot guess the installed version", 3)
-    print("  identical units per candidate ref:")
-    for identical, neg_custom, ref in scores[:5]:
-        print(f"    {identical:4} identical  {-neg_custom:4} customized   {display_ref(ref)}")
-    chosen = scores[0][2]
-    base_src: WorkTree | GitRef = GitRef(repo, chosen, url=url)
-    base_src.ref = display_ref(chosen)
-    base_manifest = read_manifest_from(base_src)
-    base_version = upstream_version(base_src) or base_manifest.get("nexus_version") or "0.0.0"
-    installed, inv = compute_baseline(project, base_src, base_manifest, base_version)
-    print(f"  baseline: Nexus {base_version} @ {base_src.ref}: {len(inv['identical'])} identical, "
-          f"{len(inv['customized'])} customized, {len(inv['absent'])} absent")
-    for uid in inv["customized"]:
-        print(f"    customized  {uid}")
-    if args.apply:
-        write_json_atomic(project_root / INSTALLED_FILE, installed)
-        print(f"  wrote {INSTALLED_FILE}")
+    source, manifest, version = _open_target(args, None)
+    history = NexusHistory(repo, manifest)
+    if not history.available:
+        print("  WARNING: the history of Nexus is not readable here; every difference counts as a local edit.")
+    try:
+        candidates = identify_version(project, repo, url, history)
+    except UpdaterError:
+        candidates = []
+    if len(candidates) == 1:
+        identified = candidates[0].lstrip("v")
+        print(f"  installed version: {identified} (identified from file contents: {candidates[0]} is the only "
+              "release that explains every Nexus file here)")
+    elif candidates:
+        identified = "unknown"
+        print(f"  installed version: unknown (several releases explain the files equally: {', '.join(candidates)})")
     else:
-        print(f"  (dry-run: {INSTALLED_FILE} not written)")
-    print()
-    source, manifest, version = _open_target(args, installed)
+        identified = "unknown"
+        print("  installed version: unknown (no single release explains the Nexus files here)")
+    installed, inv = compute_retrofit_baseline(project, source, manifest, history,
+                                               identified if identified != "unknown" else "0.0.0", identified)
+    if inv["newest"]:
+        print(f"  newest Nexus content found here: first shipped {inv['newest'][0]} (commit {inv['newest'][1]})")
+    print(f"  per unit, against Nexus {version}:")
+    print(f"    current     {len(inv['current']):4}  identical to {version}")
+    print(f"    earlier     {len(inv['earlier']):4}  earlier Nexus content, never edited here → updated")
+    print(f"    local-edit  {len(inv['local-edit']):4}  content Nexus never shipped → documents kept, runtime code is a conflict")
+    print(f"    absent      {len(inv['absent']):4}  → added")
+    if inv["refused"]:
+        print(f"    refused     {len(inv['refused']):4}  cannot be parsed safely → left alone")
+    for uid in inv["earlier"]:
+        print(f"      earlier     {uid}")
+    for uid in inv["local-edit"]:
+        print(f"      local-edit  {uid}")
+    for msg in inv["refused"]:
+        print(f"      refused     {msg}")
+    print(f"  ({INSTALLED_FILE} is written only with --apply, together with the files)\n")
     return perform_apply(project_root, installed, source, manifest, version, do_apply=args.apply,
                          restore=set(args.restore or []), backup_dir=args.backup_dir,
-                         in_session=args.in_session, allow_downgrade=args.allow_downgrade, title="update")
+                         in_session=args.in_session, allow_downgrade=args.allow_downgrade, title="retrofit",
+                         retrofit_from=f"{identified} (not recorded)" if identified != "unknown" else "unknown")
 
 
 # --------------------------------------------------------------------------
@@ -2608,6 +2951,149 @@ def selftest(real_root: pathlib.Path) -> int:
             r = subprocess.run([sys.executable, str(boot), "--upstream", str(template), "--ref", "v1.1.0",
                                 "--project-root", str(fresh2)], capture_output=True, text=True, timeout=300)
             check(r.returncode == 0 and "Nothing to write" in r.stdout, f"T11 nexus.py from a local checkout + ref:\n{r.stdout[-300:]}")
+
+        # T12 — installations without a baseline (spec §8b). Upstream gains an untagged commit and a
+        # 1.2.0 release that changes two hooks and adds a registered one, so old runtime code exists.
+        _w(template, ".claude/hooks/nexus-bootstrap.py", "#!/usr/bin/env python3\n# bootstrap mid\n", exec_bit=True)
+        _git_commit_all(template, "fixture mid (untagged)")
+        mid = git(template, "rev-parse", "HEAD").strip()
+        _w(template, ".claude/hooks/nexus-bootstrap.py", "#!/usr/bin/env python3\n# bootstrap 1.2\n", exec_bit=True)
+        _w(template, ".claude/hooks/_nexus_common.py", "# common 1.2\n", exec_bit=True)
+        _w(template, ".claude/hooks/nexus-new.py", "#!/usr/bin/env python3\n# new\n", exec_bit=True)
+        st12 = json.loads((template / ".claude/settings.json").read_text())
+        st12["hooks"]["SessionStart"] = [{"matcher": "", "hooks": [
+            {"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/nexus-new.py", "timeout": 5}]}]
+        _w(template, ".claude/settings.json", json.dumps(st12, indent=2) + "\n")
+        cm = template / "CLAUDE.md"
+        cm.write_text(cm.read_text().replace("More protocol.", "More protocol, 1.2."))
+        _w(template, VERSION_FILE, "1.2.0\n")
+        (template / MANIFEST_FILE).write_text(json.dumps(generate_manifest(template), indent=2) + "\n")
+        _git_commit_all(template, "fixture 1.2.0")
+        git(template, "tag", "v1.2.0")
+        up12 = GitRef(template, "refs/tags/v1.2.0")
+        runtime12 = [".claude/hooks/nexus-bootstrap.py", ".claude/hooks/_nexus_common.py", ".claude/hooks/nexus-new.py"]
+
+        def mkhost(name: str, ref: str, edit=None) -> pathlib.Path:
+            h = tmp / name
+            h.mkdir()
+            tar = subprocess.run(["git", "-C", str(template), "archive", ref], capture_output=True, check=True).stdout
+            subprocess.run(["tar", "-x", "-C", str(h)], input=tar, check=True)
+            for rel in ("README.md", VERSION_FILE, MANIFEST_FILE):
+                (h / rel).unlink(missing_ok=True)
+            if edit:
+                edit(h)
+            git(h, "init", "-q", "-b", "main")
+            _git_commit_all(h, "host")
+            return h
+
+        def tree_state(h: pathlib.Path) -> dict[str, bytes]:
+            return {p.relative_to(h).as_posix(): p.read_bytes() for p in sorted(h.rglob("*"))
+                    if p.is_file() and ".git" not in p.parts and "backups" not in p.parts}
+
+        def runtime_at_12(h: pathlib.Path) -> bool:
+            return all((h / rel).read_bytes() == up12.read(rel) for rel in runtime12) and \
+                json.loads((h / ".claude/settings.json").read_text()) == json.loads(up12.read(".claude/settings.json"))
+
+        # (1) clean project, traces only, a modern installation: the three plain states.
+        empty = tmp / "t12-empty"
+        empty.mkdir()
+        check(detect_installation(empty)["state"] == "absent", "T12 empty directory is absent")
+        _w(empty, ".nexus/README.md", "# leftover\n")
+        check(detect_installation(empty)["state"] == "traces", "T12 a lone .nexus/ is traces, not an installation")
+        check(detect_installation(fresh)["state"] == "baselined", "T12 installed.json present → baselined")
+        rc = quiet_main(["--project-root", str(fresh), "up", "--upstream", url])
+        check(rc == 0 and "→ update" in last_output[0] and "1.1.0 → 1.2.0" in last_output[0],
+              f"T12 modern installation takes the ordinary update path:\n{last_output[0]}")
+
+        # (2) an old installation (v1.0.0) without installed.json: version identified, every file updated.
+        old = mkhost("t12-old", "v1.0.0")
+        hist = NexusHistory(ensure_cache(url), up12_m := read_manifest_from(up12))
+        check(hist.available and hist.knows(".claude/hooks/_nexus_common.py", "replace", b"# common\n") is not None
+              and hist.knows(".claude/hooks/_nexus_common.py", "replace", b"# mine\n") is None, "T12 history tells shipped from unshipped")
+        check(detect_installation(old)["state"] == "unbaselined", "T12 old installation detected as unbaselined")
+        before = tree_state(old)
+        rc = quiet_main(["--project-root", str(old), "up", "--upstream", url])
+        out = last_output[0]
+        check(rc == 0 and "installed version: 1.0.0" in out and "unknown → " not in out and tree_state(old) == before,
+              f"T12 old: dry-run identifies 1.0.0 and writes nothing:\n{out}")
+        check("earlier" in out and "      earlier     .claude/hooks/_nexus_common.py" in out,
+              f"T12 old: stale runtime is earlier Nexus content, not a customization:\n{out}")
+        rc = quiet_main(["--project-root", str(old), "up", "--upstream", url, "--apply"])
+        inst = load_installed(old)
+        check(rc == 0 and runtime_at_12(old) and inst["nexus_version"] == "1.2.0"
+              and inst["retrofit"]["identified"] == "1.0.0" and not any(
+                  r.get("customized_at_baseline") or r.get("local_edit_at_retrofit") for r in inst["units"].values()),
+              f"T12 old: apply brings runtime and baseline to 1.2.0 with nothing marked customized; rc={rc}\n{last_output[0]}")
+        check(b"More protocol, 1.2." in (old / "CLAUDE.md").read_bytes(), "T12 old: owned CLAUDE.md section updated")
+
+        # (3) re-run after the migration: no change at all, baseline not even rewritten.
+        _git_commit_all(old, "migrated")
+        before = tree_state(old)
+        rc = quiet_main(["--project-root", str(old), "up", "--upstream", url, "--apply"])
+        check(rc == 0 and "Nothing to write" in last_output[0] and tree_state(old) == before,
+              f"T12 re-run after migration is a no-op:\n{last_output[0]}")
+        check(git(old, "status", "--porcelain").strip() == "", "T12 re-run leaves the git tree clean")
+
+        # (4) unknown version (an untagged commit) with documents edited by the project.
+        def edit_docs(h: pathlib.Path) -> None:
+            _append(h / "knowledge/specs/spec--system--alpha.md", "\nproject knowledge\n")
+            c = h / "CLAUDE.md"
+            c.write_text(c.read_text().replace("Protocol text, revised.", "Protocol text, revised. Our rule."))
+        unk = mkhost("t12-unknown", mid, edit_docs)
+        rc = quiet_main(["--project-root", str(unk), "up", "--upstream", url])
+        out = last_output[0]
+        check(rc == 0 and "installed version: unknown" in out and "unknown → 1.2.0" in out,
+              f"T12 unknown: no version is attributed:\n{out}")
+        rc = quiet_main(["--project-root", str(unk), "up", "--upstream", url, "--apply"])
+        check(rc == 0 and runtime_at_12(unk), f"T12 unknown: runtime updated; rc={rc}\n{last_output[0]}")
+        check(b"project knowledge" in (unk / "knowledge/specs/spec--system--alpha.md").read_bytes()
+              and b"Our rule." in (unk / "CLAUDE.md").read_bytes(), "T12 unknown: edited documents kept")
+        check(load_installed(unk)["units"]["knowledge/specs/spec--system--alpha.md"].get("customized_at_baseline") is True,
+              "T12 unknown: edited document recorded as customized")
+
+        # (5) old hooks under a new settings.json, one hook edited by the project: nothing mixes.
+        def new_config(h: pathlib.Path) -> None:
+            (h / ".claude/settings.json").write_bytes(up12.read(".claude/settings.json"))
+            _append(h / ".claude/hooks/_nexus_common.py", "# our tweak\n")
+        mixed = mkhost("t12-mixed", "v1.0.0", new_config)
+        det = detect_installation(mixed)
+        check(det["state"] == "damaged" and any("nexus-new.py" in d for d in det["defects"]),
+              f"T12 mixed: a registered hook without its file is a defect: {det}")
+        rc = quiet_main(["--project-root", str(mixed), "up", "--upstream", url, "--apply"])
+        out = last_output[0]
+        check(rc == 1 and "RUNTIME HELD BACK" in out and "[conflict    ] .claude/hooks/_nexus_common.py" in out,
+              f"T12 mixed: edited hook is a conflict and the runtime is held:\n{out}")
+        check(b"# our tweak" in (mixed / ".claude/hooks/_nexus_common.py").read_bytes()
+              and (mixed / ".claude/hooks/nexus-bootstrap.py").read_bytes() == b"#!/usr/bin/env python3\n"
+              and not (mixed / ".claude/hooks/nexus-new.py").exists()
+              and b"More protocol, 1.2." not in (mixed / "CLAUDE.md").read_bytes(),
+              "T12 mixed: no hook, tool or CLAUDE.md section written while held")
+        check((mixed / "knowledge/specs/spec--system--new.md").is_file(), "T12 mixed: the vault still updates")
+        _git_commit_all(mixed, "partial")
+        rc = quiet_main(["--project-root", str(mixed), "up", "--upstream", url, "--apply",
+                         "--restore", ".claude/hooks/_nexus_common.py", "--backup-dir", str(tmp / "t12-bk")])
+        check(rc == 0 and runtime_at_12(mixed) and b"More protocol, 1.2." in (mixed / "CLAUDE.md").read_bytes(),
+              f"T12 mixed: --restore releases the whole runtime at once; rc={rc}\n{last_output[0]}")
+        bk = tmp / "t12-bk/.claude/hooks/_nexus_common.py"
+        check(bk.is_file() and b"# our tweak" in bk.read_bytes(), "T12 mixed: the edited hook is backed up")
+
+        # (6) partially damaged: unreadable baseline, a hook deleted; and a legacy SOKI runtime.
+        def damage(h: pathlib.Path) -> None:
+            (h / ".claude/hooks/nexus-exit-gate.py").unlink()
+            _w(h, INSTALLED_FILE, "{not json\n")
+        dmg = mkhost("t12-damaged", "v1.0.0", damage)
+        det = detect_installation(dmg)
+        check(det["state"] == "damaged" and len(det["defects"]) == 2, f"T12 damaged: two defects named: {det['defects']}")
+        rc = quiet_main(["--project-root", str(dmg), "up", "--upstream", url, "--apply", "--backup-dir", str(tmp / "t12-dbk")])
+        check(rc == 0 and (dmg / ".claude/hooks/nexus-exit-gate.py").read_bytes() == up12.read(".claude/hooks/nexus-exit-gate.py")
+              and load_installed(dmg)["nexus_version"] == "1.2.0", f"T12 damaged: repaired; rc={rc}\n{last_output[0]}")
+        dbk = tmp / "t12-dbk" / INSTALLED_FILE
+        check(dbk.is_file() and dbk.read_text() == "{not json\n", "T12 damaged: unreadable baseline backed up")
+        soki = mkhost("t12-soki", "v1.0.0", lambda h: _w(h, ".claude/hooks/soki-tool-gate.py", "# old\n"))
+        before = tree_state(soki)
+        rc = quiet_main(["--project-root", str(soki), "up", "--upstream", url, "--apply"])
+        check(rc == 1 and "SOKI" in last_output[0] and tree_state(soki) == before,
+              f"T12 legacy SOKI runtime: refused, nothing written:\n{last_output[0]}")
     except UpdaterError as e:
         failures.append(f"unexpected UpdaterError during selftest: {e}")
     finally:
