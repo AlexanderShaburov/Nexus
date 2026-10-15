@@ -370,6 +370,8 @@ Brief §9, plus what the repository added. Decisions recorded on 2026-09-22 are 
 
 Retrofit reworked (2026-10-15, prepared for the next release, not tagged): the first attempt to update `a_bot`, an installation older than baselines, showed the retrofit's flaw on a second host. The guess scored v1.4.0 to v1.6.1 equally (22 identical / 15 customized), the tie fell to the newest tag, and the plan would have recorded 1.6.1 while keeping 15 old Nexus files, five hooks among them, as "customized" beside new hooks and a new `settings.json`. The Liquid_Nexus retrofit of 2026-09-22 had shown the same thing (its conflicts "showed only stale Nexus wording") without the cause being named. The retrofit now decides per unit against the whole history of the repository (earlier Nexus content → update; content never shipped → kept, or a conflict for runtime code), reports the version only when one release explains every file, writes runtime code only as one coherent set, and reports four installation states. Contract: spec §8b; selftest T12, rehearsed on an archive of the template at `445dcd0` (June 2026), which the old retrofit also mis-scored.
 
+Released as `v1.7.0` the same day and applied to `a_bot` by the operator: unknown version, five hooks recognised as earlier Nexus content and replaced together, eight documents kept as local edits, baseline at 1.7.0, a second `up` wrote nothing. One defect of 1.7.0 surfaced: `a_bot` received `validate-vault.py` in that run, its vault had 51 errors in project documents, and post-apply validation reported them as a failed update (exit 5). Fixed in 1.7.1: vault errors count against the run only in documents it wrote.
+
 ---
 
 ## 13. Risks

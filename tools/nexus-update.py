@@ -1415,11 +1415,14 @@ def live_session_recent(project_root: pathlib.Path) -> bool:
     return (time.time() - p.stat().st_mtime) < LIVE_SESSION_SECONDS
 
 
-def run_post_apply_validation(project_root: pathlib.Path, runtime_only: bool = False) -> list[str]:
+def run_post_apply_validation(project_root: pathlib.Path, runtime_only: bool = False,
+                              written: set[str] | None = None, notes: list[str] | None = None) -> list[str]:
     """spec §8: vault clean, validator selftest, hooks compile, settings.json sane.
 
     runtime_only skips the vault validator; apply uses it before writing, to tell defects the
-    project already had from defects the run introduced.
+    project already had from defects the run introduced. With `written` (the paths this run
+    wrote), vault errors in other documents are the project's own: they go to `notes`, not to
+    the problems, since a host may meet the validator for the first time in this very run.
     """
     problems: list[str] = []
     validator = project_root / "tools" / "validate-vault.py"
@@ -1427,9 +1430,23 @@ def run_post_apply_validation(project_root: pathlib.Path, runtime_only: bool = F
         for extra in ([], ["--selftest"]):
             r = subprocess.run([sys.executable, str(validator), "--root", str(project_root), *extra],
                                capture_output=True, text=True, cwd=str(project_root), timeout=300)
-            if r.returncode != 0:
-                problems.append(f"validate-vault.py {' '.join(extra) or '(vault)'} exit {r.returncode}: "
-                                f"{(r.stdout + r.stderr).strip()[-400:]}")
+            if r.returncode == 0:
+                continue
+            errors = [ln for ln in r.stdout.splitlines() if ": ERROR [" in ln]
+            if not extra and written is not None and errors:
+                mine = [ln for ln in errors if ln.split(":", 1)[0] in written]
+                foreign = {ln.split(":", 1)[0] for ln in errors} - {ln.split(":", 1)[0] for ln in mine}
+                if foreign and notes is not None:
+                    notes.append(f"{len(errors) - len(mine)} vault error(s) in {len(foreign)} document(s) this run "
+                                 "did not write; they are the project's own, not caused by the update "
+                                 "(python3 tools/validate-vault.py lists them)")
+                if not mine:
+                    continue
+                problems.append("validate-vault.py (vault): errors in documents this run wrote:\n    "
+                                + "\n    ".join(mine[:20]))
+                continue
+            problems.append(f"validate-vault.py {' '.join(extra) or '(vault)'} exit {r.returncode}: "
+                            f"{(r.stdout + r.stderr).strip()[-400:]}")
     hooks_dir = project_root / ".claude" / "hooks"
     if hooks_dir.is_dir():
         import py_compile
@@ -2237,9 +2254,11 @@ def perform_apply(project_root: pathlib.Path, installed: dict, source: WorkTree 
     print(f"\n  backup:    {bdir}" if any(o["exists"] for o in ops) else "\n  backup:    nothing pre-existing to back up")
     print(f"  baseline:  {INSTALLED_FILE} {'written' if installing else 'rewritten'} "
           f"({len(new_installed['units'])} units, Nexus {new_installed['nexus_version']})")
-    problems = [p for p in run_post_apply_validation(project_root) if p not in preexisting]
+    notes: list[str] = []
+    problems = [p for p in run_post_apply_validation(project_root, written={o["path"] for o in ops}, notes=notes)
+                if p not in preexisting]
     still = [p for p in preexisting if p in run_post_apply_validation(project_root, runtime_only=True)]
-    for p in still:
+    for p in still + notes:
         print(f"  still present (the project had it before this run): {p}")
     if problems:
         print("\nPOST-APPLY VALIDATION FAILED:", file=sys.stderr)
@@ -2247,7 +2266,8 @@ def perform_apply(project_root: pathlib.Path, installed: dict, source: WorkTree 
             print(f"  - {p}", file=sys.stderr)
         print(f"Files are in place; restore from {bdir} or fix forward.", file=sys.stderr)
         return 5
-    print("  validation: vault clean, validator selftest passed, hooks compile, settings.json sane")
+    print("  validation: " + ("documents written by this run clean" if notes else "vault clean")
+          + ", validator selftest passed, hooks compile, settings.json sane")
     if installing:
         print("\nNexus installed. Next, in this directory:")
         print(f"  1. git add -A && git commit -m 'chore(nexus): install Nexus {version}'")
@@ -3037,6 +3057,7 @@ def selftest(real_root: pathlib.Path) -> int:
         # (4) unknown version (an untagged commit) with documents edited by the project.
         def edit_docs(h: pathlib.Path) -> None:
             _append(h / "knowledge/specs/spec--system--alpha.md", "\nproject knowledge\n")
+            _w(h, "knowledge/specs/spec--project--no-frontmatter.md", "# the project's own, never validated before\n")
             c = h / "CLAUDE.md"
             c.write_text(c.read_text().replace("Protocol text, revised.", "Protocol text, revised. Our rule."))
         unk = mkhost("t12-unknown", mid, edit_docs)
@@ -3046,6 +3067,8 @@ def selftest(real_root: pathlib.Path) -> int:
               f"T12 unknown: no version is attributed:\n{out}")
         rc = quiet_main(["--project-root", str(unk), "up", "--upstream", url, "--apply"])
         check(rc == 0 and runtime_at_12(unk), f"T12 unknown: runtime updated; rc={rc}\n{last_output[0]}")
+        check("did not write" in last_output[0] and "VALIDATION FAILED" not in last_output[0],
+              f"T12 unknown: the project's own vault errors are reported, not blamed on the run:\n{last_output[0]}")
         check(b"project knowledge" in (unk / "knowledge/specs/spec--system--alpha.md").read_bytes()
               and b"Our rule." in (unk / "CLAUDE.md").read_bytes(), "T12 unknown: edited documents kept")
         check(load_installed(unk)["units"]["knowledge/specs/spec--system--alpha.md"].get("customized_at_baseline") is True,
